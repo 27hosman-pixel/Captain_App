@@ -9,64 +9,65 @@ import SwiftUI
 
 struct ContentView: View {
     var body: some View {
-        ZStack {
-            // 1. Background
-            Color.white
-                .ignoresSafeArea()
+        NavigationStack {
+            ZStack {
+                // 1. Background
+                Color.white
+                    .ignoresSafeArea()
 
-            VStack {
-                // 2. App Title
-                Text("CAPTAIN") .font(.system(size: 56, weight: .bold, design: .monospaced))
-                    .foregroundColor(.black)
-                    .padding(.top, 48)
-                    .frame(maxWidth: .infinity, alignment: .center)
+                VStack {
+                    // 2. App Title
+                    Text("CAPTAIN") .font(.system(size: 56, weight: .bold, design: .monospaced))
+                        .foregroundColor(.black)
+                        .padding(.top, 48)
+                        .frame(maxWidth: .infinity, alignment: .center)
 
-                // bring the logo and buttons closer to the title
-                Spacer(minLength: 8)
+                    // bring the logo and buttons closer to the title
+                    Spacer(minLength: 8)
 
-                // 3. Circular logo with gradient background
-                ZStack {
-                    //Circle()
-                        //.fill(
+                    // 3. Circular logo with gradient background
+                    ZStack {
+                        //Circle()
+                            //.fill(
                             //LinearGradient(
-                                //gradient: Gradient(colors: [Color(red: 0.72, green: 0.86, blue: 0.93), Color(red: 0.55, green: 0.75, blue: 0.88)]),
-                                //startPoint: .topLeading,
-                                //endPoint: .bottomTrailing
+                            //gradient: Gradient(colors: [Color(red: 0.72, green: 0.86, blue: 0.93), Color(red: 0.55, green: 0.75, blue: 0.88)]),
+                            //startPoint: .topLeading,
+                            //endPoint: .bottomTrailing
                           //  )
                         //)
                         //.frame(width: 220, height: 220)
                         //.shadow(color: Color.black.opacity(0.12), radius: 14, x: 0, y: 8)
 
-                    Image("CaptainLogo")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 350, height: 350)
-                }
-                .padding(.bottom, 64)
-
-                Spacer().frame(height: 12)
-
-                // 4. Buttons
-                VStack(spacing: 18) {
-                    Button(action: {
-                        print("Log In tapped")
-                    }) {
-                        Text("LOG IN")
-                            .font(.headline)
+                        Image("CaptainLogo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 350, height: 350)
                     }
-                    .buttonStyle(PillButtonStyle(colors: [Color(red: 0.78, green: 0.94, blue: 0.99), Color(red: 0.68, green: 0.91, blue: 0.98)], foreground: .black))
+                    .padding(.bottom, 64)
 
-                    Button(action: {
-                        print("Sign Up tapped")
-                    }) {
-                        Text("SIGN UP")
-                            .font(.headline)
+                    Spacer().frame(height: 12)
+
+                    // 4. Buttons
+                    VStack(spacing: 18) {
+                        NavigationLink(destination: LoginView()) {
+                            Text("LOG IN")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(PillButtonStyle(colors: [Color(red: 0.78, green: 0.94, blue: 0.99), Color(red: 0.68, green: 0.91, blue: 0.98)], foreground: .black))
+
+                        NavigationLink(destination: SignUpView()) {
+                            Text("SIGN UP")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(PillButtonStyle(colors: [Color(red: 0.84, green: 0.87, blue: 0.98), Color(red: 0.72, green: 0.79, blue: 0.96)], foreground: .black))
                     }
-                    .buttonStyle(PillButtonStyle(colors: [Color(red: 0.84, green: 0.87, blue: 0.98), Color(red: 0.72, green: 0.79, blue: 0.96)], foreground: .black))
+                    .padding(.horizontal, 36)
+                    .padding(.bottom, 67)
                 }
-                .padding(.horizontal, 36)
-                .padding(.bottom, 67)
             }
+            .navigationBarHidden(true)
         }
     }
 }
