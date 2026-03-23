@@ -39,9 +39,7 @@ final class ProfileStore: ObservableObject {
 
 struct BuildProfileView: View {
     @StateObject private var store = ProfileStore()
-    @Environment(
-        \.presentationMode
-    ) var presentationMode
+    @EnvironmentObject var router: AppRouter
 
     var body: some View {
         NavigationStack {
@@ -61,20 +59,23 @@ struct BuildProfileView: View {
                             .foregroundColor(.secondary)
                     }
 
-                    TextField("School", text: $store.profile.school)
-                    TextField("Grade", text: $store.profile.grade)
-                    TextField("Location (City)", text: $store.profile.location)
+                    TextField("School", text: Binding(get: { store.profile.school }, set: { store.profile.school = $0 }))
+                    TextField("Grade", text: Binding(get: { store.profile.grade }, set: { store.profile.grade = $0 }))
+                    TextField("Location (City)", text: Binding(get: { store.profile.location }, set: { store.profile.location = $0 }))
                 }
 
                 Section(header: Text("Soccer")) {
-                    TextField("Position", text: $store.profile.position)
-                    TextField("Club Team", text: $store.profile.clubTeam)
+                    TextField("Position", text: Binding(get: { store.profile.position }, set: { store.profile.position = $0 }))
+                    TextField("Club Team", text: Binding(get: { store.profile.clubTeam }, set: { store.profile.clubTeam = $0 }))
                 }
 
                 Section {
                     Button("Save") {
                         store.save()
-                        presentationMode.wrappedValue.dismiss()
+                        // navigate to profile view after saving
+                        DispatchQueue.main.async {
+                            router.navigate(.profile)
+                        }
                     }
                     Button("Clear") {
                         store.clear()
@@ -97,5 +98,6 @@ struct BuildProfileView: View {
 struct BuildProfileView_Previews: PreviewProvider {
     static var previews: some View {
         BuildProfileView()
+            .environmentObject(AppRouter())
     }
 }

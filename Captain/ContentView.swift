@@ -8,8 +8,10 @@
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var router = AppRouter()
+
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $router.path) {
             ZStack {
                 // 1. Background
                 Color.white
@@ -27,17 +29,6 @@ struct ContentView: View {
 
                     // 3. Circular logo with gradient background
                     ZStack {
-                        //Circle()
-                            //.fill(
-                            //LinearGradient(
-                            //gradient: Gradient(colors: [Color(red: 0.72, green: 0.86, blue: 0.93), Color(red: 0.55, green: 0.75, blue: 0.88)]),
-                            //startPoint: .topLeading,
-                            //endPoint: .bottomTrailing
-                          //  )
-                        //)
-                        //.frame(width: 220, height: 220)
-                        //.shadow(color: Color.black.opacity(0.12), radius: 14, x: 0, y: 8)
-
                         Image("CaptainLogo")
                             .resizable()
                             .scaledToFit()
@@ -49,14 +40,14 @@ struct ContentView: View {
 
                     // 4. Buttons
                     VStack(spacing: 18) {
-                        NavigationLink(destination: LoginView()) {
+                        NavigationLink(value: Destination.login) {
                             Text("LOG IN")
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(PillButtonStyle(colors: [Color(red: 0.78, green: 0.94, blue: 0.99), Color(red: 0.68, green: 0.91, blue: 0.98)], foreground: .black))
 
-                        NavigationLink(destination: SignUpView()) {
+                        NavigationLink(value: Destination.signup) {
                             Text("SIGN UP")
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
@@ -68,6 +59,26 @@ struct ContentView: View {
                 }
             }
             .navigationBarHidden(true)
+            .navigationDestination(for: Destination.self) { dest in
+                switch dest {
+                case .home:
+                    HomeView()
+                case .login:
+                    LoginView()
+                case .signup:
+                    SignUpView()
+                case .buildProfile:
+                    BuildProfileView()
+                case .profile:
+                    ProfileView()
+                case .logSession:
+                    // replace with your LogNewSession view when available
+                    Text("Log Session")
+                case .settings:
+                    Text("Settings")
+                }
+            }
+            .environmentObject(router)
         }
     }
 }
