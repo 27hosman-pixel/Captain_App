@@ -2,6 +2,8 @@ import SwiftUI
 import Combine
 
 struct PlayerProfile: Codable {
+    var firstName: String = ""
+    var lastName: String = ""
     var dob: Date?
     var school: String = ""
     var grade: String = ""
@@ -42,49 +44,51 @@ struct BuildProfileView: View {
     @EnvironmentObject var router: AppRouter
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section(header: Text("Personal")) {
-                    DatePicker("Date of Birth", selection: Binding(get: {
-                        store.profile.dob ?? Date()
-                    }, set: { newVal in
-                        store.profile.dob = newVal
-                        store.profile.age = calculateAge(from: newVal)
-                    }), displayedComponents: .date)
+        Form {
+            Section(header: Text("Personal")) {
+                // Name fields
+                TextField("First name", text: Binding(get: { store.profile.firstName }, set: { store.profile.firstName = $0 }))
+                TextField("Last name", text: Binding(get: { store.profile.lastName }, set: { store.profile.lastName = $0 }))
 
-                    HStack {
-                        Text("Age")
-                        Spacer()
-                        Text(store.profile.age.map { String($0) } ?? "—")
-                            .foregroundColor(.secondary)
-                    }
+                DatePicker("Date of Birth", selection: Binding(get: {
+                    store.profile.dob ?? Date()
+                }, set: { newVal in
+                    store.profile.dob = newVal
+                    store.profile.age = calculateAge(from: newVal)
+                }), displayedComponents: .date)
 
-                    TextField("School", text: Binding(get: { store.profile.school }, set: { store.profile.school = $0 }))
-                    TextField("Grade", text: Binding(get: { store.profile.grade }, set: { store.profile.grade = $0 }))
-                    TextField("Location (City)", text: Binding(get: { store.profile.location }, set: { store.profile.location = $0 }))
+                HStack {
+                    Text("Age")
+                    Spacer()
+                    Text(store.profile.age.map { String($0) } ?? "—")
+                        .foregroundColor(.secondary)
                 }
 
-                Section(header: Text("Soccer")) {
-                    TextField("Position", text: Binding(get: { store.profile.position }, set: { store.profile.position = $0 }))
-                    TextField("Club Team", text: Binding(get: { store.profile.clubTeam }, set: { store.profile.clubTeam = $0 }))
-                }
-
-                Section {
-                    Button("Save") {
-                        store.save()
-                        // navigate to profile view after saving
-                        DispatchQueue.main.async {
-                            router.navigate(.profile)
-                        }
-                    }
-                    Button("Clear") {
-                        store.clear()
-                    }
-                    .foregroundColor(.red)
-                }
+                TextField("School", text: Binding(get: { store.profile.school }, set: { store.profile.school = $0 }))
+                TextField("Grade", text: Binding(get: { store.profile.grade }, set: { store.profile.grade = $0 }))
+                TextField("Location (City)", text: Binding(get: { store.profile.location }, set: { store.profile.location = $0 }))
             }
-            .navigationTitle("Build Your Profile")
+
+            Section(header: Text("Soccer")) {
+                TextField("Position", text: Binding(get: { store.profile.position }, set: { store.profile.position = $0 }))
+                TextField("Club Team", text: Binding(get: { store.profile.clubTeam }, set: { store.profile.clubTeam = $0 }))
+            }
+
+            Section {
+                Button("Save") {
+                    store.save()
+                    // navigate to profile view after saving
+                    DispatchQueue.main.async {
+                        router.navigate(.profile)
+                    }
+                }
+                Button("Clear") {
+                    store.clear()
+                }
+                .foregroundColor(.red)
+            }
         }
+        .navigationTitle("Build Your Profile")
     }
 
     func calculateAge(from dob: Date) -> Int {

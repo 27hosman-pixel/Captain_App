@@ -7,6 +7,10 @@ struct SignUpView: View {
     @State private var email: String = ""
     @State private var password: String = ""
 
+    // added validation alert state
+    @State private var showValidationAlert: Bool = false
+    @State private var alertMessage: String = ""
+
     private var runningInPreview: Bool {
         ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
     }
@@ -45,8 +49,20 @@ struct SignUpView: View {
                 }
 
                 Button(action: {
-                    // TODO: implement sign up action
+                    // simple validation before navigating
+                    let f = firstName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let l = lastName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let e = email.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                    if f.isEmpty || l.isEmpty || e.isEmpty || password.count < 6 {
+                        alertMessage = "Please enter your full name, a valid email, and a password of at least 6 characters."
+                        showValidationAlert = true
+                        return
+                    }
+
+                    // TODO: perform real sign-up logic here (network request, validation, etc.)
                     print("Sign up", firstName, lastName, email)
+
                     if runningInPreview {
                         print("Preview: skipping navigation to Build Profile")
                     } else {
@@ -60,6 +76,9 @@ struct SignUpView: View {
                 }
                 .buttonStyle(PillButtonStyle(colors: [Color(red: 0.57, green: 0.66, blue: 0.98)], foreground: .white))
                 .padding(.top, 8)
+                .alert(alertMessage, isPresented: $showValidationAlert) {
+                    Button("OK", role: .cancel) { }
+                }
 
                 // Link to build profile
                 Button(action: {

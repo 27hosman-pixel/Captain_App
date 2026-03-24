@@ -57,8 +57,23 @@ struct ContentView: View {
                     .padding(.horizontal, 36)
                     .padding(.bottom, 67)
                 }
+
+                // Sidebar overlay
+                if router.isSidebarVisible {
+                    Color.black.opacity(0.35)
+                        .ignoresSafeArea()
+                        .onTapGesture { router.hideSidebar() }
+
+                    HStack {
+                        SidebarView()
+                            .frame(maxWidth: 320)
+                            .environmentObject(router)
+                        Spacer()
+                    }
+                    .transition(.move(edge: .leading))
+                }
             }
-            .navigationBarHidden(true)
+            .navigationBarHidden(router.path.count == 0)
             .navigationDestination(for: Destination.self) { dest in
                 switch dest {
                 case .home:
