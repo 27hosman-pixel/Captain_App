@@ -8,6 +8,10 @@ enum Destination: Hashable {
     case buildProfile
     case profile
     case logSession
+    case logPractice
+    case logGame
+    case logWorkout
+    case preview
     case settings
 }
 

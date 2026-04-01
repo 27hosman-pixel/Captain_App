@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var router = AppRouter()
+    @StateObject private var previewStore = PreviewStore()
 
     var body: some View {
         NavigationStack(path: $router.path) {
@@ -87,13 +88,21 @@ struct ContentView: View {
                 case .profile:
                     ProfileView()
                 case .logSession:
-                    // replace with your LogNewSession view when available
-                    Text("Log Session")
+                    LogSessionChoiceView()
+                case .logPractice:
+                    LogPracticeView()
+                case .logGame:
+                    LogGameView()
+                case .logWorkout:
+                    LogWorkoutView()
+                case .preview:
+                    SessionPreviewView()
                 case .settings:
                     Text("Settings")
                 }
             }
             .environmentObject(router)
+            .environmentObject(previewStore)
         }
     }
 }
