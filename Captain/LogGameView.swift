@@ -263,7 +263,7 @@ struct LogGameView: View {
                         }
 
                         Button(action: saveSession) {
-                            Text("Save Game")
+                            Text("Preview")
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding()

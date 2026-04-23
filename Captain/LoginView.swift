@@ -35,12 +35,12 @@ struct LoginView: View {
                 Button(action: {
                     // TODO: implement login action
                     print("Log in with", email)
-                    // simulate success -> navigate to Home (deferred to avoid navigation-time crash)
+                    // simulate success -> navigate to Profile (deferred to avoid navigation-time crash)
                     if runningInPreview {
-                        print("Preview: skipping navigation to Home")
+                        print("Preview: skipping navigation to Profile")
                     } else {
                         DispatchQueue.main.async {
-                            router.navigate(.home)
+                            router.replaceWith(.profile)
                         }
                     }
                 }) {
@@ -55,7 +55,7 @@ struct LoginView: View {
                         print("Preview: skipping navigation to Build Profile")
                     } else {
                         DispatchQueue.main.async {
-                            router.navigate(.buildProfile)
+                            router.replaceWith(.buildProfile)
                         }
                     }
                 }) {

@@ -41,7 +41,6 @@ final class ProfileStore: ObservableObject {
 
 struct BuildProfileView: View {
     @StateObject private var store = ProfileStore()
-    @EnvironmentObject var router: AppRouter
 
     var body: some View {
         Form {
@@ -77,10 +76,8 @@ struct BuildProfileView: View {
             Section {
                 Button("Save") {
                     store.save()
-                    // navigate to profile view after saving
-                    DispatchQueue.main.async {
-                        router.navigate(.profile)
-                    }
+                    // Post a notification; ContentView listens and navigates safely
+                    NotificationCenter.default.post(name: Notification.Name("NavigateToProfile"), object: nil)
                 }
                 Button("Clear") {
                     store.clear()
@@ -102,6 +99,5 @@ struct BuildProfileView: View {
 struct BuildProfileView_Previews: PreviewProvider {
     static var previews: some View {
         BuildProfileView()
-            .environmentObject(AppRouter())
     }
 }

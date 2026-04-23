@@ -209,7 +209,7 @@ struct LogPracticeView: View {
                         }
 
                         Button(action: saveSession) {
-                            Text("Save Practice")
+                            Text("Preview")
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding()
@@ -258,7 +258,7 @@ struct LogPracticeView: View {
         // Use environment object injection at call site — instead we'll post a notification that PreviewStore can listen to, but simpler: navigate and rely on global PreviewStore injected in ContentView
         DispatchQueue.main.async {
             // populate shared PreviewStore (retrieved from environment in ContentView)
-            NotificationCenter.default.post(name: Notification.Name("SetPreview"), object: nil, userInfo: ["title": trimmedTitle, "date": date, "location": location, "type": session.sessionType, "details": details, "images": selectedImages])
+            NotificationCenter.default.post(name: Notification.Name("SetPreview"), object: nil, userInfo: ["title": trimmedTitle, "date": date, "location": location, "type": session.sessionType, "details": details, "images": selectedImages, "origin": "practice"])
             router.navigate(.preview)
         }
     }

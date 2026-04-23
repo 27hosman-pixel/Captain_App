@@ -22,36 +22,35 @@ struct ProfileView: View {
 
                 Spacer().frame(height: 8)
 
-                // Big action buttons
-                VStack(spacing: 14) {
-                    Button(action: { print("About Me tapped") }) {
-                        Text("About Me!")
-                            .font(.title3).bold()
-                            .frame(maxWidth: .infinity, minHeight: 56)
+                // Profile details card (replaces About Me button)
+                VStack(spacing: 12) {
+                    HStack {
+                        Text("About")
+                            .font(.headline)
+                        Spacer()
+                        Button(action: {
+                            NotificationCenter.default.post(name: Notification.Name("NavigateToBuildProfile"), object: nil)
+                        }) {
+                            Text("Edit")
+                                .font(.subheadline).bold()
+                        }
                     }
-                    .buttonStyle(OutlineButtonStyle())
 
-                    Button(action: { print("Season Stats tapped") }) {
-                        Text("Season Stats")
-                            .font(.title3).bold()
-                            .frame(maxWidth: .infinity, minHeight: 56)
-                    }
-                    .buttonStyle(OutlineButtonStyle())
+                    Divider()
 
-                    Button(action: { print("My Log tapped") }) {
-                        Text("My Log")
-                            .font(.title3).bold()
-                            .frame(maxWidth: .infinity, minHeight: 56)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack { Text("DOB").foregroundColor(.secondary); Spacer(); Text(formattedDOB()) }
+                        HStack { Text("Age").foregroundColor(.secondary); Spacer(); Text(derivedAge()) }
+                        HStack { Text("School").foregroundColor(.secondary); Spacer(); Text(store.profile.school.isEmpty ? "—" : store.profile.school) }
+                        HStack { Text("Grade").foregroundColor(.secondary); Spacer(); Text(store.profile.grade.isEmpty ? "—" : store.profile.grade) }
+                        HStack { Text("Location").foregroundColor(.secondary); Spacer(); Text(store.profile.location.isEmpty ? "—" : store.profile.location) }
+                        HStack { Text("Position").foregroundColor(.secondary); Spacer(); Text(store.profile.position.isEmpty ? "—" : store.profile.position) }
+                        HStack { Text("Club").foregroundColor(.secondary); Spacer(); Text(store.profile.clubTeam.isEmpty ? "—" : store.profile.clubTeam) }
                     }
-                    .buttonStyle(OutlineButtonStyle())
-
-                    Button(action: { print("Share my Profile tapped") }) {
-                        Text("Share my Profile")
-                            .font(.title3).bold()
-                            .frame(maxWidth: .infinity, minHeight: 56)
-                    }
-                    .buttonStyle(OutlineButtonStyle())
                 }
+                .padding()
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemGray6)))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.separator)))
                 .padding(.horizontal)
 
                 Spacer()
@@ -64,7 +63,7 @@ struct ProfileView: View {
 
             // Always-visible floating hamburger button in top-left (in-content)
             Button(action: {
-                router.toggleSidebar()
+                NotificationCenter.default.post(name: Notification.Name("ToggleSidebar"), object: nil)
             }) {
                 Image(systemName: "line.horizontal.3")
                     .foregroundColor(.primary)
@@ -74,17 +73,27 @@ struct ProfileView: View {
             .padding(.top, 8)
             .padding(.leading, 8)
             .accessibilityLabel("Open menu")
+
+            // Bottom bar overlay: ensure it's visible on ProfileView
+            VStack {
+                Spacer()
+                BottomBarView()
+                    .environmentObject(router)
+                    .padding(.bottom, 0)
+            }
+            .edgesIgnoringSafeArea(.bottom)
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button(action: {
-                    router.toggleSidebar()
+                    NotificationCenter.default.post(name: Notification.Name("ToggleSidebar"), object: nil)
                 }) {
                     Image(systemName: "line.horizontal.3")
                         .imageScale(.large)
                 }
             }
         }
+        // Bottom bar is provided by ContentView; no overlay here.
     }
 
     private func displayName() -> String {
@@ -94,6 +103,27 @@ struct ProfileView: View {
             return [f, l].filter { !$0.isEmpty }.joined(separator: " ")
         }
         return "Your Name"
+    }
+
+    private func formattedDOB() -> String {
+        // store.profile.dob is optional; unwrap safely
+        guard let dob = store.profile.dob else { return "—" }
+        let df = DateFormatter()
+        df.dateStyle = .medium
+        return df.string(from: dob)
+    }
+
+    private func derivedAge() -> String {
+        // store.profile.age is optional; prefer explicit age if present
+        if let age = store.profile.age, age > 0 {
+            return String(age)
+        }
+        // compute from dob if available
+        guard let dob = store.profile.dob else { return "—" }
+        let cal = Calendar.current
+        let comps = cal.dateComponents([.year], from: dob, to: Date())
+        if let years = comps.year { return String(years) }
+        return "—"
     }
 }
 

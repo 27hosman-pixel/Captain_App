@@ -3,6 +3,7 @@ import SwiftUI
 struct SessionPreviewView: View {
     @EnvironmentObject var previewStore: PreviewStore
     @EnvironmentObject var router: AppRouter
+    @EnvironmentObject var sessionStore: SessionStore
 
     var body: some View {
         ScrollView {
@@ -25,7 +26,7 @@ struct SessionPreviewView: View {
                 if !previewStore.images.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
-                            ForEach(previewStore.images, id: \.self) { img in
+                            ForEach(Array(previewStore.images.enumerated()), id: \.0) { index, img in
                                 Image(uiImage: img)
                                     .resizable()
                                     .scaledToFill()
@@ -59,8 +60,8 @@ struct SessionPreviewView: View {
                 // Actions
                 HStack(spacing: 12) {
                     Button(action: {
-                        // For now, treat "Post" as save and go back home
-                        // TODO: persist and upload
+                        // Persist session using SessionStore
+                        sessionStore.addSession(title: previewStore.title, date: previewStore.date, location: previewStore.location, sessionType: previewStore.sessionType, details: previewStore.details, images: previewStore.images, origin: previewStore.origin)
                         previewStore.clear()
                         router.popToRoot()
                     }) {
@@ -69,6 +70,18 @@ struct SessionPreviewView: View {
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(RoundedRectangle(cornerRadius: 12).fill(Color.blue))
+                    }
+
+                    Button(action: {
+                        // Save draft
+                        previewStore.saveDraft()
+                        previewStore.clear()
+                        router.popToRoot()
+                    }) {
+                        Text("Save Draft")
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(RoundedRectangle(cornerRadius: 12).stroke(Color(.systemGray4)))
                     }
 
                     Button(action: {
@@ -94,5 +107,6 @@ struct SessionPreviewView_Previews: PreviewProvider {
         SessionPreviewView()
             .environmentObject(PreviewStore())
             .environmentObject(AppRouter())
+            .environmentObject(SessionStore())
     }
 }

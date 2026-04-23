@@ -13,8 +13,11 @@ enum Destination: Hashable {
     case logWorkout
     case preview
     case settings
+    case messaging
+    case notifications
 }
 
+@MainActor
 final class AppRouter: ObservableObject {
     @Published var path = NavigationPath()
     @Published var current: Destination?
@@ -27,6 +30,13 @@ final class AppRouter: ObservableObject {
         if current == destination {
             return
         }
+        path.append(destination)
+        current = destination
+    }
+
+    /// Replace the whole navigation stack with a single destination.
+    func replaceWith(_ destination: Destination) {
+        path = NavigationPath()
         path.append(destination)
         current = destination
     }

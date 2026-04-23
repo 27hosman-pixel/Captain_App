@@ -232,7 +232,7 @@ struct LogWorkoutView: View {
                         }
 
                         Button(action: saveSession) {
-                            Text("Save Workout")
+                            Text("Preview")
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding()
@@ -261,8 +261,21 @@ struct LogWorkoutView: View {
         let session = WorkoutSession(title: trimmedTitle, workoutType: workoutType, focusArea: focusArea, date: date, durationMinutes: duration, sprints: sprints, peakHeartRate: peak, customStats: customStats, totalMiles: miles, notes: notes)
         print("Saved workout:", session)
 
+        // Build details dictionary
+        var details: [String: String] = [
+            "Type": workoutType,
+            "Focus": focusArea,
+            "Duration": duration != nil ? "\(duration!)" : "",
+            "Sprints": sprints != nil ? "\(sprints!)" : "",
+            "Peak HR": peak != nil ? "\(peak!)" : "",
+            "Miles": miles != nil ? String(format: "%.2f", miles!) : "",
+            "Notes": notes
+        ]
+        for s in customStats { details[s.name] = s.value }
+
         DispatchQueue.main.async {
-            router.navigate(.home)
+            NotificationCenter.default.post(name: Notification.Name("SetPreview"), object: nil, userInfo: ["title": trimmedTitle, "date": date, "location": "", "type": "Workout", "details": details, "images": selectedImages, "origin": "workout"])
+            router.navigate(.preview)
         }
     }
 }

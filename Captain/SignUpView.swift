@@ -66,9 +66,8 @@ struct SignUpView: View {
                     if runningInPreview {
                         print("Preview: skipping navigation to Build Profile")
                     } else {
-                        DispatchQueue.main.async {
-                            router.navigate(.buildProfile)
-                        }
+                        // post a notification which ContentView listens for and navigates safely
+                        NotificationCenter.default.post(name: Notification.Name("NavigateToBuildProfile"), object: nil)
                     }
                 }) {
                     Text("Sign up")
@@ -85,9 +84,7 @@ struct SignUpView: View {
                     if runningInPreview {
                         print("Preview: skipping navigation to Build Profile")
                     } else {
-                        DispatchQueue.main.async {
-                            router.navigate(.buildProfile)
-                        }
+                        NotificationCenter.default.post(name: Notification.Name("NavigateToBuildProfile"), object: nil)
                     }
                 }) {
                     Text("Build your profile")

@@ -1,8 +1,6 @@
 import SwiftUI
 
 struct LogSessionChoiceView: View {
-    @EnvironmentObject var router: AppRouter
-
     var body: some View {
         VStack(spacing: 24) {
             Text("Log New Session")
@@ -15,7 +13,7 @@ struct LogSessionChoiceView: View {
             Spacer()
 
             VStack(spacing: 16) {
-                Button(action: { router.navigate(.logPractice) }) {
+                Button(action: { NotificationCenter.default.post(name: Notification.Name("NavigateToLogPractice"), object: nil) }) {
                     HStack {
                         Image(systemName: "whistle")
                             .font(.title2)
@@ -35,7 +33,7 @@ struct LogSessionChoiceView: View {
                     .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemGray6)))
                 }
 
-                Button(action: { router.navigate(.logGame) }) {
+                Button(action: { NotificationCenter.default.post(name: Notification.Name("NavigateToLogGame"), object: nil) }) {
                     HStack {
                         Image(systemName: "sportscourt")
                             .font(.title2)
@@ -55,7 +53,7 @@ struct LogSessionChoiceView: View {
                     .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemGray6)))
                 }
 
-                Button(action: { router.navigate(.logWorkout) }) {
+                Button(action: { NotificationCenter.default.post(name: Notification.Name("NavigateToLogWorkout"), object: nil) }) {
                     HStack {
                         Image(systemName: "figure.run")
                             .font(.title2)

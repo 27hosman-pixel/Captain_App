@@ -30,45 +30,92 @@ final class FeedStore: ObservableObject {
 
 struct HomeView: View {
     @StateObject private var store = FeedStore()
+    @EnvironmentObject var router: AppRouter
 
     var body: some View {
-        Group {
-            if store.posts.isEmpty {
-                EmptyFeedView(onFindFriends: findFriends, onLogSession: logFirstSession)
-                    .padding()
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 20, pinnedViews: []) {
-                        ForEach(store.posts) { post in
-                            PostCardView(post: post)
-                                .padding(.horizontal)
+        ZStack {
+            // Header + main content
+            VStack(spacing: 0) {
+                // Top header matching the provided mock
+                VStack(spacing: 8) {
+                    HStack(spacing: 12) {
+                        Text("CAPTAIN")
+                            .font(.system(size: 28, weight: .black, design: .rounded))
+                            .foregroundColor(.primary)
+                            .tracking(1.5)
+
+                        Spacer()
+
+                        HStack(spacing: 10) {
+                            Button(action: {
+                                NotificationCenter.default.post(name: Notification.Name("OpenMessaging"), object: nil)
+                            }) {
+                                Image(systemName: "bubble.left.and.bubble.right")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(.primary)
+                                    .padding(8)
+                                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                            }
+
+                            Button(action: {
+                                NotificationCenter.default.post(name: Notification.Name("OpenNotifications"), object: nil)
+                            }) {
+                                Image(systemName: "bell")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(.primary)
+                                    .padding(8)
+                                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                            }
                         }
                     }
-                    .padding(.vertical, 12)
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+
+                    // thin divider
+                    Divider()
+                        .background(Color(.separator))
                 }
-                .background(Color(.systemGroupedBackground).ignoresSafeArea())
-            }
-        }
-        .navigationTitle("Home")
-        .toolbarBackground(.visible, for: .navigationBar)
-        .toolbarBackground(Color(.systemBackground), for: .navigationBar)
-        .onAppear {
-            // For now load sample posts in preview or quick demo; in production, replace with network/db load
-            if store.posts.isEmpty {
-                store.loadSample()
-            }
-        }
-    }
 
-    // MARK: - Actions
-    private func findFriends() {
-        // placeholder - wire to recruiter/search flow
-        print("Find friends tapped")
-    }
+                // ...existing content... (feed and empty-state)
+                VStack {
+                    if store.posts.isEmpty {
+                        EmptyFeedView(
+                            onFindFriends: {
+                                // Placeholder action — implement friend search later
+                                print("Find Friends tapped")
+                            },
+                            onLogSession: {
+                                // Navigate to the log session choice screen
+                                Task { @MainActor in
+                                    router.navigate(.logSession)
+                                }
+                            }
+                        )
+                    } else {
+                        ScrollView {
+                            VStack(spacing: 12) {
+                                ForEach(store.posts, id: \.id) { post in
+                                    PostCardView(post: post)
+                                        .padding(.horizontal)
+                                }
+                            }
+                        }
+                    }
+                }
+                .onAppear {
+                    store.loadSample()
+                }
+            }
 
-    private func logFirstSession() {
-        // placeholder - open Log New Session flow
-        print("Log first session tapped")
+            // Bottom bar overlay (kept as-is)
+            VStack {
+                Spacer()
+                BottomBarView()
+                    .environmentObject(router)
+                    .padding(.bottom, 0)
+            }
+            .edgesIgnoringSafeArea(.bottom)
+        }
     }
 }
 
@@ -211,5 +258,6 @@ struct HomeView_Previews: PreviewProvider {
                 }
                 .previewDisplayName("Empty Feed")
         }
+        .environmentObject(AppRouter())
     }
 }
