@@ -12,6 +12,8 @@ enum Destination: Hashable {
     case logGame
     case logWorkout
     case preview
+    case activities
+    case statistics
     case settings
     case messaging
     case notifications

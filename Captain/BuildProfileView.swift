@@ -11,6 +11,13 @@ struct PlayerProfile: Codable {
     var location: String = ""
     var position: String = ""
     var clubTeam: String = ""
+    // persisted follower/following counts
+    var followers: Int = 0
+    var following: Int = 0
+    // simple goals fields (editable from ProfileView)
+    var goalsDay: String = ""
+    var goalsWeek: String = ""
+    var goalsSeason: String = ""
 }
 
 final class ProfileStore: ObservableObject {

@@ -10,6 +10,8 @@ struct Post: Identifiable, Hashable {
     let goals: Int
     let assists: Int
     let minutesPlayed: Int
+    var likes: Int = 0
+    var comments: Int = 0
 }
 
 final class FeedStore: ObservableObject {
@@ -18,8 +20,8 @@ final class FeedStore: ObservableObject {
     // Sample loader for previews and quick testing
     func loadSample() {
         posts = [
-            Post(author: "riya_tad", timeAgo: "3:47 pm", title: "Game vs. Hinsdale Central (3-1 W)", imageNames: [], goals: 3, assists: 1, minutesPlayed: 90),
-            Post(author: "coach_mike", timeAgo: "Yesterday", title: "Practice: Small-sided drills", imageNames: [], goals: 0, assists: 0, minutesPlayed: 60)
+            Post(author: "riya_tad", timeAgo: "3:47 pm", title: "Game vs. Hinsdale Central (3-1 W)", imageNames: [], goals: 3, assists: 1, minutesPlayed: 90, likes: 12, comments: 3),
+            Post(author: "coach_mike", timeAgo: "Yesterday", title: "Practice: Small-sided drills", imageNames: [], goals: 0, assists: 0, minutesPlayed: 60, likes: 4, comments: 1)
         ]
     }
 
@@ -48,7 +50,9 @@ struct HomeView: View {
 
                         HStack(spacing: 10) {
                             Button(action: {
-                                NotificationCenter.default.post(name: Notification.Name("OpenMessaging"), object: nil)
+                                Task { @MainActor in
+                                    router.navigate(.messaging)
+                                }
                             }) {
                                 Image(systemName: "bubble.left.and.bubble.right")
                                     .font(.system(size: 18))
@@ -58,7 +62,9 @@ struct HomeView: View {
                             }
 
                             Button(action: {
-                                NotificationCenter.default.post(name: Notification.Name("OpenNotifications"), object: nil)
+                                Task { @MainActor in
+                                    router.navigate(.notifications)
+                                }
                             }) {
                                 Image(systemName: "bell")
                                     .font(.system(size: 18))
@@ -121,14 +127,19 @@ struct HomeView: View {
 
 struct PostCardView: View {
     let post: Post
+    @State private var isLiked: Bool = false
+    @State private var likeCount: Int = 0
+    @State private var commentCount: Int = 0
+    @State private var showCommentSheet: Bool = false
+    @State private var newComment: String = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Header
-            HStack(alignment: .top, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
                 Circle()
-                    .fill(Color.blue.opacity(0.2))
-                    .frame(width: 44, height: 44)
+                    .fill(Color.blue.opacity(0.12))
+                    .frame(width: 48, height: 48)
                     .overlay(Image(systemName: "person.fill").foregroundColor(.blue))
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -144,54 +155,124 @@ struct PostCardView: View {
                     Text(post.title)
                         .font(.headline)
                         .foregroundColor(.primary)
+                        .lineLimit(2)
                 }
             }
 
-            // Images (placeholder boxes if no assets)
-            if post.imageNames.isEmpty {
-                HStack(spacing: 12) {
-                    ForEach(0..<min(2, 3), id: \.self) { _ in
-                        Rectangle()
-                            .fill(Color(.systemGray5))
-                            .frame(height: 120)
-                            .overlay(Image(systemName: "photo").foregroundColor(.secondary))
-                            .cornerRadius(8)
-                    }
-                    Spacer()
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 28))
-                        .foregroundColor(.secondary)
-                }
-            } else {
-                // If images provided, show up to 3 thumbnails
-                HStack(spacing: 12) {
-                    ForEach(post.imageNames.prefix(3), id: \.self) { name in
+            // Media area
+            HStack(spacing: 12) {
+                if post.imageNames.isEmpty {
+                    // two-placeholder layout
+                    Rectangle()
+                        .fill(Color(.systemGray5))
+                        .frame(width: 160, height: 120)
+                        .cornerRadius(10)
+                        .overlay(Image(systemName: "photo").foregroundColor(.secondary))
+
+                    Rectangle()
+                        .fill(Color(.systemGray6))
+                        .frame(height: 120)
+                        .cornerRadius(10)
+                        .overlay(Image(systemName: "map").foregroundColor(.secondary))
+                } else {
+                    ForEach(post.imageNames.prefix(2), id: \.self) { name in
                         Image(name)
                             .resizable()
                             .scaledToFill()
                             .frame(height: 120)
                             .clipped()
-                            .cornerRadius(8)
+                            .cornerRadius(10)
                     }
-                    Spacer()
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 28))
-                        .foregroundColor(.secondary)
                 }
             }
 
-            // Big stats row
-            HStack(alignment: .firstTextBaseline) {
-                Text("Stats: \(post.goals) G, \(post.assists) A, \(post.minutesPlayed) MP")
-                    .font(.system(size: 26, weight: .bold))
+            // Stats row
+            HStack(spacing: 16) {
+                HStack(spacing: 8) {
+                    Image(systemName: "target")
+                    Text("\(post.goals) G")
+                }
+                HStack(spacing: 8) {
+                    Image(systemName: "bolt.fill")
+                    Text("\(post.assists) A")
+                }
+                HStack(spacing: 8) {
+                    Image(systemName: "clock")
+                    Text("\(post.minutesPlayed) min")
+                }
                 Spacer()
             }
-            .padding(.top, 6)
+            .font(.subheadline)
+            .foregroundColor(.secondary)
+
+            // Action bar
+            HStack(spacing: 12) {
+                Button(action: {
+                    // toggle like locally
+                    isLiked.toggle()
+                    likeCount += isLiked ? 1 : -1
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: isLiked ? "hand.thumbsup.fill" : "hand.thumbsup")
+                        Text("\(likeCount)")
+                    }
+                    .padding(8)
+                    .foregroundColor(isLiked ? .blue : .primary)
+                }
+
+                Button(action: {
+                    showCommentSheet = true
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "message")
+                        Text("\(commentCount)")
+                    }
+                    .padding(8)
+                    .foregroundColor(.primary)
+                }
+
+                Spacer()
+
+                Button(action: {
+                    // share placeholder
+                    print("Share tapped for \(post.title)")
+                }) {
+                    Image(systemName: "square.and.arrow.up")
+                        .padding(8)
+                }
+            }
+            .font(.subheadline)
+
         }
         .padding()
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color(.systemBackground)))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(.separator)))
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.separator)))
         .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 4)
+        .onAppear {
+            likeCount = post.likes
+            commentCount = post.comments
+        }
+        .sheet(isPresented: $showCommentSheet) {
+            NavigationView {
+                VStack {
+                    List {
+                        TextField("Add a comment...", text: $newComment)
+                    }
+                    HStack {
+                        Button("Cancel") { showCommentSheet = false }
+                        Spacer()
+                        Button("Post") {
+                            // naive increment
+                            commentCount += 1
+                            newComment = ""
+                            showCommentSheet = false
+                        }
+                    }
+                    .padding()
+                }
+                .navigationTitle("Comments")
+            }
+        }
     }
 }
 

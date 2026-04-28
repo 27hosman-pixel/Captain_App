@@ -12,6 +12,7 @@ struct PreviewData: Identifiable {
     var details: [String: String]
     var images: [UIImage]
     var origin: String?
+    var isPublic: Bool = true
 }
 
 // A lightweight store to hold a session preview before posting
@@ -23,6 +24,7 @@ final class PreviewStore: ObservableObject {
     @Published var details: [String: String] = [:] // arbitrary key-value pairs (goals, stats, etc)
     @Published var images: [UIImage] = []
     @Published var origin: String? = nil
+    @Published var isPublic: Bool = true
 
     @Published var drafts: [PreviewData] = []
 
@@ -43,9 +45,10 @@ final class PreviewStore: ObservableObject {
         if let det = userInfo["details"] as? [String: String] { details = det }
         if let imgs = userInfo["images"] as? [UIImage] { images = imgs }
         if let o = userInfo["origin"] as? String { origin = o }
+        if let p = userInfo["isPublic"] as? Bool { isPublic = p }
     }
 
-    func setPreview(title: String, date: Date, location: String, sessionType: String, details: [String: String], images: [UIImage], origin: String? = nil) {
+    func setPreview(title: String, date: Date, location: String, sessionType: String, details: [String: String], images: [UIImage], origin: String? = nil, isPublic: Bool = true) {
         self.title = title
         self.date = date
         self.location = location
@@ -53,10 +56,11 @@ final class PreviewStore: ObservableObject {
         self.details = details
         self.images = images
         self.origin = origin
+        self.isPublic = isPublic
     }
 
     func saveDraft() {
-        let data = PreviewData(title: title, date: date, location: location, sessionType: sessionType, details: details, images: images, origin: origin)
+        let data = PreviewData(title: title, date: date, location: location, sessionType: sessionType, details: details, images: images, origin: origin, isPublic: isPublic)
         drafts.append(data)
         // Optionally clear current preview
         clear()

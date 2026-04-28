@@ -57,11 +57,25 @@ struct SessionPreviewView: View {
                 .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
                 .padding(.horizontal)
 
+                // Visibility toggle
+                HStack {
+                    Text("Visibility")
+                        .font(.subheadline).bold()
+                    Spacer()
+                    Picker("Visibility", selection: $previewStore.isPublic) {
+                        Text("Public").tag(true)
+                        Text("Private").tag(false)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 180)
+                }
+                .padding(.horizontal)
+
                 // Actions
                 HStack(spacing: 12) {
                     Button(action: {
-                        // Persist session using SessionStore
-                        sessionStore.addSession(title: previewStore.title, date: previewStore.date, location: previewStore.location, sessionType: previewStore.sessionType, details: previewStore.details, images: previewStore.images, origin: previewStore.origin)
+                        // Persist session using SessionStore (respect visibility)
+                        sessionStore.addSession(title: previewStore.title, date: previewStore.date, location: previewStore.location, sessionType: previewStore.sessionType, details: previewStore.details, images: previewStore.images, origin: previewStore.origin, isPublic: previewStore.isPublic)
                         previewStore.clear()
                         router.popToRoot()
                     }) {

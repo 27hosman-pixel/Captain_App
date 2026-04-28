@@ -32,6 +32,7 @@ struct LogPracticeView: View {
     // Photos
     @State private var selectedItems: [PhotosPickerItem] = []
     @State private var selectedImages: [UIImage] = []
+    @State private var isPublic: Bool = true
 
     var body: some View {
         ScrollView {
@@ -208,12 +209,20 @@ struct LogPracticeView: View {
                                 .background(RoundedRectangle(cornerRadius: 12).stroke(Color(.systemGray4)))
                         }
 
-                        Button(action: saveSession) {
+                        VStack(spacing: 8) {
+                            Toggle(isOn: $isPublic) {
+                                Text(isPublic ? "Public" : "Private")
+                                    .font(.caption)
+                            }
+                            .toggleStyle(.switch)
+
+                            Button(action: saveSession) {
                             Text("Preview")
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding()
                                 .background(RoundedRectangle(cornerRadius: 12).fill(Color.blue))
+                            }
                         }
                     }
                 }
@@ -258,7 +267,7 @@ struct LogPracticeView: View {
         // Use environment object injection at call site — instead we'll post a notification that PreviewStore can listen to, but simpler: navigate and rely on global PreviewStore injected in ContentView
         DispatchQueue.main.async {
             // populate shared PreviewStore (retrieved from environment in ContentView)
-            NotificationCenter.default.post(name: Notification.Name("SetPreview"), object: nil, userInfo: ["title": trimmedTitle, "date": date, "location": location, "type": session.sessionType, "details": details, "images": selectedImages, "origin": "practice"])
+            NotificationCenter.default.post(name: Notification.Name("SetPreview"), object: nil, userInfo: ["title": trimmedTitle, "date": date, "location": location, "type": session.sessionType, "details": details, "images": selectedImages, "origin": "practice", "isPublic": isPublic])
             router.navigate(.preview)
         }
     }

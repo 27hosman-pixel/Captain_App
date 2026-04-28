@@ -77,6 +77,7 @@ struct ContentView: View {
                             .onAppear { router.current = .buildProfile }
                     case .profile:
                         ProfileView()
+                            .environmentObject(sessionStore)
                             .onAppear { router.current = .profile }
                     case .logSession:
                         LogSessionChoiceView()
@@ -93,6 +94,12 @@ struct ContentView: View {
                     case .preview:
                         SessionPreviewView()
                             .onAppear { router.current = .preview }
+                    case .activities:
+                        ActivitiesView()
+                            .onAppear { router.current = .activities }
+                    case .statistics:
+                        StatisticsView()
+                            .onAppear { router.current = .statistics }
                     case .settings:
                         Text("Settings")
                             .onAppear { router.current = .settings }

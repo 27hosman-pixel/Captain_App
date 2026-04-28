@@ -44,6 +44,7 @@ struct LogGameView: View {
     // Photos
     @State private var selectedItems: [PhotosPickerItem] = []
     @State private var selectedImages: [UIImage] = []
+    @State private var isPublic: Bool = true
 
     var body: some View {
         ScrollView {
@@ -262,12 +263,20 @@ struct LogGameView: View {
                                 .background(RoundedRectangle(cornerRadius: 12).stroke(Color(.systemGray4)))
                         }
 
-                        Button(action: saveSession) {
+                        VStack(spacing: 8) {
+                            Toggle(isOn: $isPublic) {
+                                Text(isPublic ? "Public" : "Private")
+                                    .font(.caption)
+                            }
+                            .toggleStyle(.switch)
+
+                            Button(action: saveSession) {
                             Text("Preview")
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding()
                                 .background(RoundedRectangle(cornerRadius: 12).fill(Color.blue))
+                            }
                         }
                     }
                 }
@@ -309,7 +318,7 @@ struct LogGameView: View {
         for s in customStats { details[s.name] = s.value }
 
         DispatchQueue.main.async {
-            NotificationCenter.default.post(name: Notification.Name("SetPreview"), object: nil, userInfo: ["title": trimmedTitle, "date": date, "location": location, "type": "Game", "details": details, "images": selectedImages])
+            NotificationCenter.default.post(name: Notification.Name("SetPreview"), object: nil, userInfo: ["title": trimmedTitle, "date": date, "location": location, "type": "Game", "details": details, "images": selectedImages, "isPublic": isPublic])
             router.navigate(.preview)
         }
     }

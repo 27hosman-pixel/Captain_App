@@ -10,8 +10,9 @@ struct SessionData: Identifiable, Codable, Hashable {
     var details: [String: String]
     var imageFileNames: [String]
     var origin: String?
+    var isPublic: Bool
 
-    init(id: UUID = UUID(), title: String, date: Date, location: String, sessionType: String, details: [String: String], imageFileNames: [String] = [], origin: String? = nil) {
+    init(id: UUID = UUID(), title: String, date: Date, location: String, sessionType: String, details: [String: String], imageFileNames: [String] = [], origin: String? = nil, isPublic: Bool = true) {
         self.id = id
         self.title = title
         self.date = date
@@ -20,6 +21,37 @@ struct SessionData: Identifiable, Codable, Hashable {
         self.details = details
         self.imageFileNames = imageFileNames
         self.origin = origin
+        self.isPublic = isPublic
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, date, location, sessionType, details, imageFileNames, origin, isPublic
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        date = try c.decode(Date.self, forKey: .date)
+        location = try c.decode(String.self, forKey: .location)
+        sessionType = try c.decode(String.self, forKey: .sessionType)
+        details = try c.decode([String: String].self, forKey: .details)
+        imageFileNames = try c.decode([String].self, forKey: .imageFileNames)
+        origin = try c.decodeIfPresent(String.self, forKey: .origin)
+        isPublic = try c.decodeIfPresent(Bool.self, forKey: .isPublic) ?? true
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(title, forKey: .title)
+        try c.encode(date, forKey: .date)
+        try c.encode(location, forKey: .location)
+        try c.encode(sessionType, forKey: .sessionType)
+        try c.encode(details, forKey: .details)
+        try c.encode(imageFileNames, forKey: .imageFileNames)
+        try c.encodeIfPresent(origin, forKey: .origin)
+        try c.encode(isPublic, forKey: .isPublic)
     }
 }
 
@@ -82,10 +114,10 @@ final class SessionStore: ObservableObject {
         return names
     }
 
-    func addSession(title: String, date: Date, location: String, sessionType: String, details: [String: String], images: [UIImage] = [], origin: String? = nil) {
+    func addSession(title: String, date: Date, location: String, sessionType: String, details: [String: String], images: [UIImage] = [], origin: String? = nil, isPublic: Bool = true) {
         let id = UUID()
         let imageFileNames = store(images: images, for: id)
-        let s = SessionData(id: id, title: title, date: date, location: location, sessionType: sessionType, details: details, imageFileNames: imageFileNames, origin: origin)
+        let s = SessionData(id: id, title: title, date: date, location: location, sessionType: sessionType, details: details, imageFileNames: imageFileNames, origin: origin, isPublic: isPublic)
         sessions.insert(s, at: 0)
         save()
     }

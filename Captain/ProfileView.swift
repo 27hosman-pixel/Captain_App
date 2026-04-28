@@ -3,6 +3,8 @@ import SwiftUI
 struct ProfileView: View {
     @StateObject private var store = ProfileStore()
     @EnvironmentObject var router: AppRouter
+    @EnvironmentObject var sessionStore: SessionStore
+    @State private var showingGoals: Bool = false
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -20,6 +22,31 @@ struct ProfileView: View {
                     .font(.title)
                     .bold()
 
+                // Counters row: followers / activities / following
+                HStack(spacing: 20) {
+                    VStack {
+                        Text("Followers")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("\(store.profile.followers)")
+                            .font(.headline)
+                    }
+                    VStack {
+                        Text("Activities")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("\(sessionStore.sessions.count)")
+                            .font(.headline)
+                    }
+                    VStack {
+                        Text("Following")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("\(store.profile.following)")
+                            .font(.headline)
+                    }
+                }
+
                 Spacer().frame(height: 8)
 
                 // Profile details card (replaces About Me button)
@@ -29,7 +56,9 @@ struct ProfileView: View {
                             .font(.headline)
                         Spacer()
                         Button(action: {
-                            NotificationCenter.default.post(name: Notification.Name("NavigateToBuildProfile"), object: nil)
+                            Task { @MainActor in
+                                router.navigate(.buildProfile)
+                            }
                         }) {
                             Text("Edit")
                                 .font(.subheadline).bold()
@@ -52,6 +81,61 @@ struct ProfileView: View {
                 .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemGray6)))
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.separator)))
                 .padding(.horizontal)
+
+                // Quick actions: Activities / Statistics / Share
+                HStack(spacing: 12) {
+                    Button(action: {
+                        Task { @MainActor in router.navigate(.activities) }
+                    }) {
+                        VStack { Image(systemName: "list.bullet.rectangle"); Text("Activities").font(.caption) }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Color(.systemBackground)))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(.separator)))
+                    }
+
+                    Button(action: {
+                        // open goals editor sheet
+                        showingGoals = true
+                    }) {
+                        VStack { Image(systemName: "flag"); Text("Goals").font(.caption) }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Color(.systemBackground)))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(.separator)))
+                    }
+
+                    Button(action: {
+                        shareProfile()
+                    }) {
+                        VStack { Image(systemName: "square.and.arrow.up"); Text("Share").font(.caption) }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Color(.systemBackground)))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(.separator)))
+                    }
+                }
+                .padding(.horizontal)
+
+                // Mini sparkline and media carousel
+                VStack(spacing: 12) {
+                    SparklineView(values: recentSessionCounts())
+                        .frame(height: 48)
+                        .padding(.horizontal)
+
+                    HStack(spacing: 8) {
+                        ForEach(Array(recentImages().enumerated()), id: \.0) { _, img in
+                            Image(uiImage: img)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 80, height: 80)
+                                .clipped()
+                                .cornerRadius(8)
+                        }
+                        Spacer()
+                    }
+                    .padding(.horizontal)
+                }
 
                 Spacer()
             }
@@ -94,6 +178,37 @@ struct ProfileView: View {
             }
         }
         // Bottom bar is provided by ContentView; no overlay here.
+        .sheet(isPresented: $showingGoals) {
+            NavigationView {
+                Form {
+                    Section(header: Text("Daily Goal")) {
+                        TextField("Day goals", text: Binding(get: { store.profile.goalsDay }, set: { store.profile.goalsDay = $0 }))
+                    }
+                    Section(header: Text("Weekly Goal")) {
+                        TextField("Week goals", text: Binding(get: { store.profile.goalsWeek }, set: { store.profile.goalsWeek = $0 }))
+                    }
+                    Section(header: Text("Season Goal")) {
+                        TextField("Season goals", text: Binding(get: { store.profile.goalsSeason }, set: { store.profile.goalsSeason = $0 }))
+                    }
+                    Section {
+                        Button("Save") {
+                            store.save()
+                            showingGoals = false
+                        }
+                        Button("Cancel") {
+                            showingGoals = false
+                        }
+                        .foregroundColor(.red)
+                    }
+                }
+                .navigationTitle("Goals")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Done") { showingGoals = false }
+                    }
+                }
+            }
+        }
     }
 
     private func displayName() -> String {
@@ -125,6 +240,71 @@ struct ProfileView: View {
         if let years = comps.year { return String(years) }
         return "—"
     }
+
+    // MARK: - Helpers for sparkline / images / share
+    private func recentSessionCounts(days: Int = 7) -> [Double] {
+        // count sessions per day for the last `days` days
+        let calendar = Calendar.current
+        var counts = Array(repeating: 0.0, count: days)
+        let now = Date()
+        for s in sessionStore.sessions {
+            let comps = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: s.date))
+            if let daysAgo = comps.day {
+                let index = days - 1 - daysAgo
+                if index >= 0 && index < days {
+                    counts[index] += 1.0
+                }
+            }
+        }
+        return counts
+    }
+
+    private func recentImages(max: Int = 4) -> [UIImage] {
+        var imgs: [UIImage] = []
+        for s in sessionStore.sessions {
+            for name in s.imageFileNames {
+                if let img = sessionStore.image(for: name) {
+                    imgs.append(img)
+                    if imgs.count >= max { return imgs }
+                }
+            }
+        }
+        return imgs
+    }
+
+    private func shareProfile() {
+        let text = "Check out my Captain profile: \(displayName())"
+        let vc = UIActivityViewController(activityItems: [text], applicationActivities: nil)
+        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let root = scene.windows.first?.rootViewController {
+            root.present(vc, animated: true)
+        }
+    }
+
+}
+
+// A tiny sparkline view
+struct SparklineView: View {
+    var values: [Double]
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            let maxV = (values.max() ?? 1)
+            let points: [CGPoint] = values.enumerated().map { i, v in
+                let x = w * CGFloat(i) / CGFloat(max(1, values.count - 1))
+                let y = h - (h * CGFloat(v) / CGFloat(maxV == 0 ? 1 : maxV))
+                return CGPoint(x: x, y: y)
+            }
+            Path { p in
+                guard points.count > 0 else { return }
+                p.move(to: points[0])
+                for pt in points.dropFirst() { p.addLine(to: pt) }
+            }
+            .stroke(Color.blue, lineWidth: 2)
+        }
+    }
 }
 
 // Simple outline button style matching the rough mock
@@ -144,5 +324,6 @@ struct ProfileView_Previews: PreviewProvider {
     static var previews: some View {
         ProfileView()
             .environmentObject(AppRouter())
+            .environmentObject(SessionStore())
     }
 }
