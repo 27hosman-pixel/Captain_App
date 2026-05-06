@@ -101,7 +101,7 @@ struct ContentView: View {
                         StatisticsView()
                             .onAppear { router.current = .statistics }
                     case .settings:
-                        Text("Settings")
+                        SettingsView()
                             .onAppear { router.current = .settings }
                     case .messaging:
                         MessagingView()
@@ -208,3 +208,4 @@ struct PillButtonStyle: ButtonStyle {
 #Preview {
     ContentView()
 }
+

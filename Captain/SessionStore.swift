@@ -132,4 +132,34 @@ final class SessionStore: ObservableObject {
         sessions = []
         save()
     }
+
+    // MARK: - Settings helpers
+
+    func deleteAllSessionMediaFiles() {
+        guard let docs = documentsDirectory() else { return }
+        let fileNames = sessions.flatMap { $0.imageFileNames }
+        for name in fileNames {
+            let url = docs.appendingPathComponent(name)
+            if FileManager.default.fileExists(atPath: url.path) {
+                do {
+                    try FileManager.default.removeItem(at: url)
+                } catch {
+                    print("Failed to delete media file \(name):", error)
+                }
+            }
+        }
+    }
+
+    func exportData(profile: PlayerProfile?) -> Data? {
+        struct ExportBundle: Codable {
+            var exportedAt: Date
+            var profile: PlayerProfile?
+            var sessions: [SessionData]
+        }
+        let bundle = ExportBundle(exportedAt: Date(), profile: profile, sessions: sessions)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return try? encoder.encode(bundle)
+    }
 }
+
