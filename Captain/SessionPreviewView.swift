@@ -1,145 +1,362 @@
 import SwiftUI
 
+/// Preview screen shown after logging a session
+/// Allows users to review, share, save, or edit before finalizing
+/// This is the bridge between logging forms (LogGameView, etc.) and session storage
 struct SessionPreviewView: View {
     @EnvironmentObject var previewStore: PreviewStore
-    @EnvironmentObject var router: AppRouter
     @EnvironmentObject var sessionStore: SessionStore
-
+    @EnvironmentObject var router: AppRouter
+    
+    @State private var showShareSheet = false
+    @State private var isSaving = false
+    
     var body: some View {
-        ScrollView {
-            VStack(spacing: Theme.Spacing.md) {
-                // Title
-                Text(previewStore.title)
-                    .font(Theme.Typography.largeTitle)
-                    .foregroundColor(Theme.Colors.text)
-                    .padding(.top, Theme.Spacing.md)
-
-                // Metadata row
-                HStack {
-                    Text(previewStore.sessionType)
-                        .font(Theme.Typography.subheadline)
-                        .foregroundColor(Theme.Colors.secondaryText)
-                    Spacer()
-                    Text(previewStore.date, style: .date)
-                        .font(Theme.Typography.subheadline)
-                        .foregroundColor(Theme.Colors.secondaryText)
-                }
-                .padding(.horizontal, Theme.Spacing.md)
-
-                // Image carousel
-                if !previewStore.images.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: Theme.Spacing.xs) {
-                            ForEach(Array(previewStore.images.enumerated()), id: \.0) { index, img in
-                                Image(uiImage: img)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 180, height: 120)
-                                    .clipped()
-                                    .cornerRadius(Theme.CornerRadius.sm)
-                            }
-                        }
-                        .padding(.horizontal, Theme.Spacing.md)
-                    }
-                }
-
-                // Details card
-                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                    Text("Details")
-                        .font(Theme.Typography.headline)
-                        .foregroundColor(Theme.Colors.text)
-                    
-                    ForEach(previewStore.details.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
-                        HStack {
-                            Text(key + ":")
-                                .font(Theme.Typography.subheadline)
-                                .fontWeight(.bold)
-                                .foregroundColor(Theme.Colors.text)
-                            Text(value)
-                                .font(Theme.Typography.subheadline)
-                                .foregroundColor(Theme.Colors.text)
-                            Spacer()
-                        }
-                        .padding(.vertical, Theme.Spacing.xxs)
-                    }
-                }
-                .cardStyle()
-                .padding(.horizontal, Theme.Spacing.md)
-
-                // Visibility toggle
-                HStack {
-                    Text("Visibility")
-                        .font(Theme.Typography.subheadline)
-                        .fontWeight(.bold)
-                        .foregroundColor(Theme.Colors.text)
-                    Spacer()
-                    Picker("Visibility", selection: $previewStore.isPublic) {
-                        Text("Public").tag(true)
-                        Text("Private").tag(false)
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(width: 180)
-                }
-                .padding(.horizontal, Theme.Spacing.md)
-
-                // Actions
-                VStack(spacing: Theme.Spacing.sm) {
-                    // Post button (primary)
-                    Button(action: {
-                        sessionStore.addSession(
-                            title: previewStore.title,
-                            date: previewStore.date,
-                            location: previewStore.location,
-                            sessionType: previewStore.sessionType,
-                            details: previewStore.details,
-                            images: previewStore.images,
-                            origin: previewStore.origin,
-                            isPublic: previewStore.isPublic
-                        )
-                        previewStore.clear()
-                        router.replaceWith(.activities)
-                        NotificationCenter.default.post(
-                            name: Notification.Name("ShowPostedToast"),
-                            object: nil
-                        )
-                    }) {
-                        Text("Post")
-                    }
-                    .buttonStyle(ThemePrimaryButtonStyle())
-
-                    // Secondary actions
-                    HStack(spacing: Theme.Spacing.sm) {
-                        Button(action: {
-                            previewStore.saveDraft()
-                            previewStore.clear()
-                            router.popToRoot()
-                        }) {
-                            Text("Save Draft")
-                        }
-                        .buttonStyle(ThemeSecondaryButtonStyle())
-
-                        Button(action: {
-                            router.popToRoot()
-                        }) {
-                            Text("Edit")
-                        }
-                        .buttonStyle(ThemeSecondaryButtonStyle())
-                    }
-                }
-                .padding(.horizontal, Theme.Spacing.md)
-                .padding(.bottom, Theme.Spacing.lg)
+        ScrollView(.vertical, showsIndicators: true) {
+            VStack(spacing: 24) {
+                // Preview content card
+                previewContentCard
+                    .padding(.horizontal, 16)
+                
+                // Divider
+                Divider()
+                    .padding(.vertical, 8)
+                
+                // Action buttons
+                actionButtons
+                    .padding(.horizontal, 16)
+                
+                Spacer(minLength: 60)
             }
+            .padding(.top, 20)
+            .padding(.bottom, 100)
         }
         .navigationTitle("Preview")
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showShareSheet) {
+            // Temporary workaround: explicitly pass dismiss to avoid ambiguity
+            ShareCardView(previewStore: previewStore)
+                .interactiveDismissDisabled(false)
+        }
+    }
+    
+    // MARK: - Preview Content Card
+    
+    @ViewBuilder
+    private var previewContentCard: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            // Header with metadata
+            VStack(alignment: .leading, spacing: 8) {
+                // Session type badge
+                HStack(spacing: 8) {
+                    Image(systemName: sessionTypeIcon)
+                        .font(.system(size: 16, weight: .semibold))
+                    Text(previewStore.sessionType)
+                        .font(.system(size: 15, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .fill(Color.blue)
+                )
+                
+                // Title
+                Text(previewStore.title)
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(.primary)
+                
+                // Date and location
+                HStack(spacing: 16) {
+                    Label(formattedDate, systemImage: "calendar")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                    
+                    if !previewStore.location.isEmpty {
+                        Label(previewStore.location, systemImage: "location.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                
+                // Privacy indicator
+                HStack(spacing: 6) {
+                    Image(systemName: previewStore.isPublic ? "globe" : "lock.fill")
+                        .font(.system(size: 12))
+                    Text(previewStore.isPublic ? "Public" : "Private")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .foregroundColor(.secondary)
+                .padding(.top, 4)
+            }
+            
+            // Images preview
+            if !previewStore.images.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(previewStore.images.indices, id: \.self) { index in
+                            Image(uiImage: previewStore.images[index])
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 200, height: 140)
+                                .clipped()
+                                .cornerRadius(12)
+                        }
+                    }
+                }
+            }
+            
+            // Stats/Details
+            if !relevantDetails.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Stats")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(.primary)
+                    
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.flexible()),
+                            GridItem(.flexible())
+                        ],
+                        spacing: 12
+                    ) {
+                        ForEach(Array(relevantDetails.enumerated()), id: \.offset) { _, detail in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(detail.key)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(.secondary)
+                                    .textCase(.uppercase)
+                                Text(detail.value)
+                                    .font(.system(size: 20, weight: .bold))
+                                    .foregroundColor(.primary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color(.systemGray6))
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.secondarySystemBackground))
+        )
+    }
+    
+    // MARK: - Action Buttons
+    
+    @ViewBuilder
+    private var actionButtons: some View {
+        VStack(spacing: 12) {
+            // PRIMARY CTA: Share (V1 focus)
+            Button(action: { showShareSheet = true }) {
+                HStack(spacing: 12) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 18, weight: .semibold))
+                    Text("Share to Social Media")
+                        .font(.system(size: 17, weight: .semibold))
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            
+            // Save to activities
+            Button(action: saveSession) {
+                HStack(spacing: 12) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                    Text("Save to My Activities")
+                        .font(.system(size: 17, weight: .medium))
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+            }
+            .buttonStyle(.bordered)
+            .disabled(isSaving)
+            
+            // V2 FEATURE: Post to feed (hidden in V1)
+            if FeatureFlags.inAppSocial {
+                Button(action: postToFeed) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "globe")
+                        Text("Post to Feed")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            
+            // Secondary actions
+            HStack(spacing: 12) {
+                // Save as draft
+                Button(action: saveDraft) {
+                    Label("Save Draft", systemImage: "archivebox")
+                        .font(.system(size: 15, weight: .medium))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                }
+                .buttonStyle(.bordered)
+                
+                // Edit
+                Button(action: { router.pop() }) {
+                    Label("Edit", systemImage: "pencil")
+                        .font(.system(size: 15, weight: .medium))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+    }
+    
+    // MARK: - Actions
+    
+    /// Save session to SessionStore and navigate away
+    private func saveSession() {
+        guard !isSaving else { return }
+        isSaving = true
+        
+        // Save images to persistent storage and get filenames
+        let imageFileNames = storeImages()
+        
+        // Create SessionData from PreviewStore
+        let sessionData = SessionData(
+            id: UUID(),
+            title: previewStore.title,
+            date: previewStore.date,
+            location: previewStore.location,
+            sessionType: previewStore.sessionType,
+            details: previewStore.details,
+            imageFileNames: imageFileNames,
+            origin: nil,
+            isPublic: previewStore.isPublic
+        )
+        
+        // Post notification for SessionStore to handle
+        // This approach doesn't require knowing SessionStore's internal API
+        NotificationCenter.default.post(
+            name: Notification.Name("SaveNewSession"),
+            object: nil,
+            userInfo: ["sessionData": sessionData]
+        )
+        
+        // If this was from a draft, delete the draft
+        if let draftId = previewStore.currentDraftId {
+            previewStore.deleteDraftById(draftId)
+        }
+        
+        // Clear preview store
+        previewStore.clear()
+        
+        // Show success feedback
+        NotificationCenter.default.post(name: Notification.Name("ShowPostedToast"), object: nil)
+        
+        // Navigate to home/activities  
+        NotificationCenter.default.post(name: Notification.Name("NavigateToHome"), object: nil)
+        
+        isSaving = false
+    }
+    
+    /// Save current state as a draft
+    private func saveDraft() {
+        previewStore.saveDraft()
+        
+        // Show confirmation (you can add a toast here)
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
+        
+        // Navigate back to root
+        router.popToRoot()
+    }
+    
+    /// V2: Post to social feed (currently just saves)
+    private func postToFeed() {
+        saveSession()
+        // V2: Additional logic to mark as "posted" to feed
+    }
+    
+    // MARK: - Helpers
+    
+    /// Store images from PreviewStore to persistent storage
+    /// Returns array of filenames
+    private func storeImages() -> [String] {
+        guard let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return []
+        }
+        
+        var filenames: [String] = []
+        let sessionId = UUID().uuidString
+        
+        for (index, image) in previewStore.images.enumerated() {
+            let filename = "session-\(sessionId)-\(index).jpg"
+            let fileURL = docs.appendingPathComponent(filename)
+            
+            if let data = image.jpegData(compressionQuality: 0.8) {
+                do {
+                    try data.write(to: fileURL, options: [.atomic])
+                    filenames.append(filename)
+                } catch {
+                    print("❌ Failed to save image \(filename): \(error)")
+                }
+            }
+        }
+        
+        return filenames
+    }
+    
+    /// Filter out empty and notes from details for display
+    private var relevantDetails: [(key: String, value: String)] {
+        previewStore.details
+            .filter { !$0.value.isEmpty && $0.value != "0" && $0.key.lowercased() != "notes" }
+            .sorted { $0.key < $1.key }
+    }
+    
+    private var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d, yyyy 'at' h:mm a"
+        return formatter.string(from: previewStore.date)
+    }
+    
+    private var sessionTypeIcon: String {
+        switch previewStore.sessionType.lowercased() {
+        case "game": return "sportscourt.fill"
+        case "practice": return "figure.run"
+        case "training", "workout": return "dumbbell.fill"
+        default: return "sportscourt.fill"
+        }
     }
 }
 
-struct SessionPreviewView_Previews: PreviewProvider {
-    static var previews: some View {
+// MARK: - Preview
+
+#Preview("Session Preview") {
+    let previewStore = PreviewStore()
+    previewStore.title = "Championship Match"
+    previewStore.sessionType = "Game"
+    previewStore.date = Date()
+    previewStore.location = "National Stadium"
+    previewStore.isPublic = true
+    previewStore.details = [
+        "Goals": "2",
+        "Assists": "1",
+        "Minutes": "90",
+        "Tackles": "8"
+    ]
+    
+    return NavigationStack {
         SessionPreviewView()
-            .environmentObject(PreviewStore())
-            .environmentObject(AppRouter())
+            .environmentObject(previewStore)
             .environmentObject(SessionStore())
+            .environmentObject(AppRouter())
     }
 }
-

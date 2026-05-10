@@ -20,6 +20,7 @@ struct GameSession: Codable, Identifiable, Hashable {
 
 struct LogGameView: View {
     @EnvironmentObject var router: AppRouter
+    @EnvironmentObject var previewStore: PreviewStore
 
     @State private var title: String = ""
     @State private var opponent: String = ""
@@ -48,6 +49,9 @@ struct LogGameView: View {
     // Visibility default from Settings
     @AppStorage("default_session_public") private var defaultSessionPublic: Bool = true
     @State private var isPublic: Bool = true
+    
+    // Track the last loaded draft ID to prevent double-loading the same draft
+    @State private var loadedDraftId: UUID?
 
     var body: some View {
         ScrollView {
@@ -251,7 +255,71 @@ struct LogGameView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             isPublic = defaultSessionPublic
+            loadDraftIfNeeded()
         }
+    }
+    
+    private func loadDraftIfNeeded() {
+        // Check if we have draft data AND we haven't loaded THIS specific draft yet
+        guard let draftId = previewStore.currentDraftId,
+              loadedDraftId != draftId,
+              !previewStore.title.isEmpty else {
+            return
+        }
+        
+        // Load data from PreviewStore (from a resumed draft)
+        title = previewStore.title
+        date = previewStore.date
+        location = previewStore.location
+        isPublic = previewStore.isPublic
+        selectedImages = previewStore.images
+        
+        // Parse details
+        if let opponentStr = previewStore.details["Opponent"] {
+            opponent = opponentStr
+        }
+        
+        if let scoreStr = previewStore.details["Final Score"] {
+            finalScore = scoreStr
+        }
+        
+        if let minutesStr = previewStore.details["Minutes"], !minutesStr.isEmpty {
+            minutesPlayedText = minutesStr
+        }
+        
+        if let goalsStr = previewStore.details["Goals"], !goalsStr.isEmpty {
+            goalsText = goalsStr
+        }
+        
+        if let assistsStr = previewStore.details["Assists"], !assistsStr.isEmpty {
+            assistsText = assistsStr
+        }
+        
+        if let tacklesStr = previewStore.details["Tackles"], !tacklesStr.isEmpty {
+            tacklesText = tacklesStr
+        }
+        
+        if let milesStr = previewStore.details["TotalMiles"], !milesStr.isEmpty {
+            totalMilesText = milesStr
+        }
+        
+        if let hrStr = previewStore.details["Avg HR"], !hrStr.isEmpty {
+            avgHeartRateText = hrStr
+        }
+        
+        if let notesStr = previewStore.details["Notes"] {
+            notes = notesStr
+        }
+        
+        // Load custom stats (any detail that's not in the standard fields)
+        let standardKeys = ["Opponent", "Final Score", "Minutes", "Goals", "Assists", "Tackles", "TotalMiles", "Avg HR", "Notes"]
+        for (key, value) in previewStore.details {
+            if !standardKeys.contains(key) {
+                customStats.append(CustomStat(name: key, value: value))
+            }
+        }
+        
+        loadedDraftId = draftId
     }
 
     private func saveSession() {

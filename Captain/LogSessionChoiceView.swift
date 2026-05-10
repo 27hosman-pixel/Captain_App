@@ -161,7 +161,7 @@ private struct CardButtonStyle: ButtonStyle {
     
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .onChange(of: configuration.isPressed) { newValue in
+            .onChange(of: configuration.isPressed) { oldValue, newValue in
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                     isPressed = newValue
                 }

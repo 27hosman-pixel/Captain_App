@@ -3,6 +3,7 @@ import SwiftUI
 struct SessionDetailView: View {
     let session: SessionData
     @EnvironmentObject var sessionStore: SessionStore
+    @State private var showShareSheet = false
 
     var body: some View {
         ScrollView {
@@ -49,6 +50,28 @@ struct SessionDetailView: View {
             .padding()
         }
         .navigationTitle("Session")
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: { showShareSheet = true }) {
+                    Image(systemName: "square.and.arrow.up")
+                }
+            }
+        }
+        .sheet(isPresented: $showShareSheet) {
+            ShareCardView(previewStore: sessionDataToPreviewStore(session))
+        }
+    }
+    
+    /// Convert SessionData to PreviewStore for sharing
+    private func sessionDataToPreviewStore(_ session: SessionData) -> PreviewStore {
+        let previewStore = PreviewStore()
+        previewStore.title = session.title
+        previewStore.date = session.date
+        previewStore.location = session.location
+        previewStore.sessionType = session.sessionType
+        previewStore.details = session.details
+        previewStore.isPublic = session.isPublic
+        return previewStore
     }
 }
 

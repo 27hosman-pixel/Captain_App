@@ -1,11 +1,11 @@
 import SwiftUI
-import SwiftUI
 import UIKit
 
 struct ProfileView: View {
     @StateObject private var store = ProfileStore()
     @EnvironmentObject var router: AppRouter
     @EnvironmentObject var sessionStore: SessionStore
+    @EnvironmentObject var previewStore: PreviewStore
     @State private var showingGoals: Bool = false
     @State private var showingAboutEditor: Bool = false
     @State private var showingPhotoPicker: Bool = false
@@ -13,6 +13,7 @@ struct ProfileView: View {
     @State private var showingImageEditor: Bool = false
     @State private var sessionToDelete: SessionData?
     @State private var showingDeleteConfirmation: Bool = false
+    @State private var showingSessionChoice: Bool = false
 
     var body: some View {
         ScrollView {
@@ -68,19 +69,18 @@ struct ProfileView: View {
                     
                     // Stats row
                     HStack(spacing: 0) {
-                        StatColumn(title: "Following", value: "\(store.profile.following)")
-                        StatColumn(title: "Followers", value: "\(store.profile.followers)")
+                        // V2_FEATURE: Social following (hidden in V1)
+                        if FeatureFlags.followSystem {
+                            StatColumn(title: "Following", value: "\(store.profile.following)")
+                            StatColumn(title: "Followers", value: "\(store.profile.followers)")
+                        }
                         StatColumn(title: "Activities", value: "\(sessionStore.sessions.count)")
                     }
                     .padding(.horizontal, Theme.Spacing.md)
                     
                     // Action buttons
                     HStack(spacing: Theme.Spacing.sm) {
-                        Button(action: {
-                            Task { @MainActor in
-                                router.navigate(.buildProfile)
-                            }
-                        }) {
+                        NavigationLink(value: Destination.buildProfile) {
                             Text("Edit Profile")
                                 .font(.system(size: 14, weight: .semibold))
                                 .foregroundColor(Theme.Colors.primary)
@@ -118,7 +118,7 @@ struct ProfileView: View {
                     RecentActivitySection(
                         sessions: sessionStore.sessions,
                         sessionStore: sessionStore,
-                        onAdd: { router.navigate(.logSessionChoice) },
+                        onAdd: { showingSessionChoice = true },
                         onDelete: { session in
                             sessionToDelete = session
                             showingDeleteConfirmation = true
@@ -267,6 +267,44 @@ struct ProfileView: View {
                     }
                     showingImageEditor = false
                 }
+            }
+        }
+        .sheet(isPresented: $showingSessionChoice) {
+            NavigationView {
+                LogSessionChoiceView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cancel") {
+                                showingSessionChoice = false
+                            }
+                        }
+                    }
+            }
+            .environmentObject(router)
+            .interactiveDismissDisabled(false)
+            .onDisappear {
+                // Small delay to ensure sheet is fully dismissed before navigation
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    // Check if we should navigate based on notifications
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToLogPractice"))) { _ in
+            showingSessionChoice = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                router.navigate(.logPractice)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToLogGame"))) { _ in
+            showingSessionChoice = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                router.navigate(.logGame)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToLogWorkout"))) { _ in
+            showingSessionChoice = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                router.navigate(.logWorkout)
             }
         }
         // Reserve space above the global bottom bar so content isn't blocked
@@ -458,6 +496,7 @@ private struct RecentActivitySection: View {
     let sessionStore: SessionStore
     var onAdd: () -> Void
     var onDelete: (SessionData) -> Void
+    @EnvironmentObject var previewStore: PreviewStore
 
     var body: some View {
         Card {
@@ -467,6 +506,29 @@ private struct RecentActivitySection: View {
                         .font(Theme.Typography.headline)
                         .foregroundColor(Theme.Colors.text)
                     Spacer()
+                    
+                    // Drafts badge if there are any
+                    if !previewStore.drafts.isEmpty {
+                        NavigationLink(value: Destination.drafts) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "doc.text")
+                                    .font(.system(size: 11))
+                                Text("Drafts")
+                                Text("(\(previewStore.drafts.count))")
+                                    .font(.system(size: 11, weight: .semibold))
+                            }
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.primary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Theme.Colors.primary.opacity(0.1))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    
                     NavigationLink("View All", value: Destination.activities)
                         .font(Theme.Typography.subheadline)
                         .foregroundColor(Theme.Colors.primary)
@@ -715,11 +777,12 @@ struct ImageCropperView: View {
     @State private var lastScale: CGFloat = 1.0
     @State private var offset: CGSize = .zero
     @State private var lastOffset: CGSize = .zero
+    @State private var viewSize: CGSize = .zero
     
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 Color.black.ignoresSafeArea()
                 
@@ -731,10 +794,10 @@ struct ImageCropperView: View {
                         // Image with zoom and pan
                         Image(uiImage: image)
                             .resizable()
-                            .scaledToFill()
+                            .aspectRatio(contentMode: .fit)
                             .scaleEffect(scale)
                             .offset(offset)
-                            .frame(width: size.width, height: size.height)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .gesture(
                                 MagnificationGesture()
                                     .onChanged { value in
@@ -765,7 +828,7 @@ struct ImageCropperView: View {
                         ZStack {
                             // Dimmed background
                             Rectangle()
-                                .fill(Color.black.opacity(0.6))
+                                .fill(Color.black.opacity(0.5))
                                 .frame(width: size.width, height: size.height)
                                 .overlay(
                                     Circle()
@@ -782,6 +845,12 @@ struct ImageCropperView: View {
                         .compositingGroup()
                     }
                     .frame(width: size.width, height: size.height)
+                    .onAppear {
+                        viewSize = size
+                    }
+                    .onChange(of: size) { oldValue, newValue in
+                        viewSize = newValue
+                    }
                 }
             }
             .navigationTitle("Adjust Photo")
@@ -792,13 +861,16 @@ struct ImageCropperView: View {
                         dismiss()
                         completion(nil)
                     }
+                    .foregroundColor(.white)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         cropImage()
                     }
+                    .foregroundColor(.white)
                 }
             }
+            .toolbarColorScheme(.dark, for: .navigationBar)
         }
     }
     
@@ -811,7 +883,7 @@ struct ImageCropperView: View {
         
         // Calculate crop parameters
         let imageSize = CGSize(width: cgImage.width, height: cgImage.height)
-        let screenSize = UIScreen.main.bounds.size
+        let screenSize = viewSize
         let cropSize = min(screenSize.width, screenSize.height) * 0.7
         
         // Scale factor from screen to image

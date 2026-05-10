@@ -15,6 +15,7 @@ struct PracticeSession: Codable, Identifiable, Hashable {
 
 struct LogPracticeView: View {
     @EnvironmentObject var router: AppRouter
+    @EnvironmentObject var previewStore: PreviewStore
 
     @State private var sessionType: String = "Team"
     @State private var title: String = ""
@@ -36,6 +37,9 @@ struct LogPracticeView: View {
     // Visibility default from Settings
     @AppStorage("default_session_public") private var defaultSessionPublic: Bool = true
     @State private var isPublic: Bool = true
+    
+    // Track the last loaded draft ID to prevent double-loading the same draft
+    @State private var loadedDraftId: UUID?
 
     var body: some View {
         ScrollView {
@@ -223,7 +227,71 @@ struct LogPracticeView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             isPublic = defaultSessionPublic
+            loadDraftIfNeeded()
         }
+    }
+    
+    private func loadDraftIfNeeded() {
+        print("🏈 LogPracticeView: loadDraftIfNeeded called")
+        print("🏈 loadedDraftId: \(String(describing: loadedDraftId))")
+        print("🏈 previewStore.currentDraftId: \(String(describing: previewStore.currentDraftId))")
+        print("🏈 previewStore.title: '\(previewStore.title)'")
+        print("🏈 previewStore.sessionType: '\(previewStore.sessionType)'")
+        print("🏈 previewStore.details: \(previewStore.details)")
+        
+        // Check if we have draft data AND we haven't loaded THIS specific draft yet
+        guard let draftId = previewStore.currentDraftId,
+              loadedDraftId != draftId,
+              !previewStore.title.isEmpty else {
+            print("🏈 LogPracticeView: Skipping draft load")
+            print("   - Has currentDraftId: \(previewStore.currentDraftId != nil)")
+            print("   - Already loaded this draft: \(loadedDraftId == previewStore.currentDraftId)")
+            print("   - Has title: \(!previewStore.title.isEmpty)")
+            return
+        }
+        
+        print("🏈 LogPracticeView: ✅ Loading draft data...")
+        
+        // Load data from PreviewStore (from a resumed draft)
+        title = previewStore.title
+        date = previewStore.date
+        location = previewStore.location
+        isPublic = previewStore.isPublic
+        selectedImages = previewStore.images
+        
+        print("🏈 Set title to: '\(title)'")
+        print("🏈 Set location to: '\(location)'")
+        print("🏈 Set images count: \(selectedImages.count)")
+        
+        // Parse details
+        if let type = previewStore.details["Type"] {
+            sessionType = type
+            print("🏈 Loaded session type: \(type)")
+        }
+        
+        if let drillsStr = previewStore.details["Drills"], !drillsStr.isEmpty {
+            drills = drillsStr.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            print("🏈 Loaded drills: \(drills)")
+        }
+        
+        if let milesStr = previewStore.details["TotalMiles"], !milesStr.isEmpty {
+            totalMilesText = milesStr
+            print("🏈 Loaded miles: \(milesStr)")
+        }
+        
+        if let hrStr = previewStore.details["Avg HR"], !hrStr.isEmpty {
+            avgHeartRateText = hrStr
+            print("🏈 Loaded HR: \(hrStr)")
+        }
+        
+        if let notesStr = previewStore.details["Notes"] {
+            notes = notesStr
+            print("🏈 Loaded notes: \(notesStr)")
+        }
+        
+        // Mark this draft as loaded
+        loadedDraftId = draftId
+        print("🏈 LogPracticeView: ✅ Draft loaded successfully! Marked as loaded: \(draftId)")
     }
 
     private func saveSession() {

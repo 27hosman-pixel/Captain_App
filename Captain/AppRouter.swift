@@ -12,6 +12,7 @@ enum Destination: Hashable {
     case logGame
     case logWorkout
     case preview
+    case drafts
     case activities
     case statistics
     case settings
@@ -46,6 +47,13 @@ final class AppRouter: ObservableObject {
     func popToRoot() {
         path.removeLast(path.count)
         current = nil
+    }
+    
+    func pop() {
+        if !path.isEmpty {
+            path.removeLast()
+            // Note: current will be inaccurate after pop, but that's ok for simple back navigation
+        }
     }
 
     func showSidebar() {

@@ -19,6 +19,7 @@ struct WorkoutSession: Codable, Identifiable, Hashable {
 
 struct LogWorkoutView: View {
     @EnvironmentObject var router: AppRouter
+    @EnvironmentObject var previewStore: PreviewStore
 
     @State private var title: String = ""
     @State private var workoutType: String = "Strength"
@@ -42,6 +43,9 @@ struct LogWorkoutView: View {
     // Visibility default from Settings
     @AppStorage("default_session_public") private var defaultSessionPublic: Bool = true
     @State private var isPublic: Bool = true
+    
+    // Track the last loaded draft ID to prevent double-loading the same draft
+    @State private var loadedDraftId: UUID?
 
     let focusOptions = ["Legs", "Arms", "Back", "Core", "Full Body"]
 
@@ -242,7 +246,69 @@ struct LogWorkoutView: View {
         .onAppear {
             // initialize visibility from Settings
             isPublic = defaultSessionPublic
+            loadDraftIfNeeded()
         }
+    }
+    
+    private func loadDraftIfNeeded() {
+        print("🔍 LogWorkout - loadDraftIfNeeded called")
+        print("🔍 currentDraftId: \(String(describing: previewStore.currentDraftId))")
+        print("🔍 loadedDraftId: \(String(describing: loadedDraftId))")
+        print("🔍 title: '\(previewStore.title)'")
+        
+        // Check if we have draft data AND we haven't loaded THIS specific draft yet
+        guard let draftId = previewStore.currentDraftId,
+              loadedDraftId != draftId else {
+            print("🔍 Guard failed - not loading draft")
+            return
+        }
+        
+        print("✅ Loading draft into LogWorkoutView")
+        
+        // Load data from PreviewStore (from a resumed draft)
+        title = previewStore.title
+        date = previewStore.date
+        isPublic = previewStore.isPublic
+        selectedImages = previewStore.images
+        
+        // Parse details
+        if let typeStr = previewStore.details["Type"] {
+            workoutType = typeStr
+        }
+        
+        if let focusStr = previewStore.details["Focus"] {
+            focusArea = focusStr
+        }
+        
+        if let durationStr = previewStore.details["Duration"], !durationStr.isEmpty {
+            durationText = durationStr
+        }
+        
+        if let sprintsStr = previewStore.details["Sprints"], !sprintsStr.isEmpty {
+            sprintsText = sprintsStr
+        }
+        
+        if let peakStr = previewStore.details["PeakHR"], !peakStr.isEmpty {
+            peakHRText = peakStr
+        }
+        
+        if let milesStr = previewStore.details["TotalMiles"], !milesStr.isEmpty {
+            totalMilesText = milesStr
+        }
+        
+        if let notesStr = previewStore.details["Notes"] {
+            notes = notesStr
+        }
+        
+        // Load custom stats (any detail that's not in the standard fields)
+        let standardKeys = ["Type", "Focus", "Duration", "Sprints", "PeakHR", "TotalMiles", "Notes"]
+        for (key, value) in previewStore.details {
+            if !standardKeys.contains(key) {
+                customStats.append(CustomStat(name: key, value: value))
+            }
+        }
+        
+        loadedDraftId = draftId
     }
 
     private func saveSession() {

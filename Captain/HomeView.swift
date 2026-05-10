@@ -38,102 +38,105 @@ struct HomeView: View {
 
     var body: some View {
         // Remove the overlayed bottom bar here; the global bar in ContentView will handle it.
-        ZStack {
-            NavigationLink(isActive: $goToMessages) {
-                MessagingView()
-            } label: { EmptyView() }
-            .hidden()
-
-            NavigationLink(isActive: $goToNotifications) {
-                NotificationsView()
-            } label: { EmptyView() }
-            .hidden()
-
-            ScrollView {
-                VStack(spacing: 0) {
-                    // apply consistent content inset to avoid leading clipping
-                    VStack(spacing: 16) {
-                        // Check BOTH sample posts and real sessions
-                        if filteredSessions.isEmpty && store.posts.isEmpty {
-                            EmptyFeedCard(
-                                onFindFriends: { print("Find Friends tapped") },
-                                onLogSession: {
-                                    Task { @MainActor in
-                                        router.navigate(.logSession)
-                                    }
-                                }
-                            )
-                        } else {
-                            HStack {
-                                Text("Latest")
-                                    .font(.headline)
-                                Spacer()
-                                Button {
-                                    showFilterSheet = true
-                                } label: {
-                                    HStack(spacing: 6) {
-                                        Label("Filters", systemImage: "slider.horizontal.3")
-                                            .font(.subheadline.bold())
-                                        
-                                        // Badge indicator for active filters
-                                        if feedFilters.hasActiveFilters {
-                                            ZStack {
-                                                Circle()
-                                                    .fill(Color.blue)
-                                                    .frame(width: 20, height: 20)
-                                                
-                                                Text("\(feedFilters.activeFilterCount)")
-                                                    .font(.system(size: 12, weight: .bold))
-                                                    .foregroundColor(.white)
-                                            }
-                                        }
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                            }
-
-                            VStack(spacing: 12) {
-                                // FIRST: Show real user sessions from SessionStore (filter out empty/invalid ones)
-                                ForEach(filteredSessions) { session in
-                                    Card {
-                                        SessionCardView(session: session, sessionStore: sessionStore)
-                                    }
-                                }
+        ScrollView {
+            VStack(spacing: 0) {
+                // apply consistent content inset to avoid leading clipping
+                VStack(spacing: 16) {
+                    // ALWAYS show the header with filter button
+                    HStack {
+                        Text("Latest")
+                            .font(.headline)
+                        Spacer()
+                        Button {
+                            showFilterSheet = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Label("Filters", systemImage: "slider.horizontal.3")
+                                    .font(.subheadline.bold())
                                 
-                                // THEN: Show sample posts from FeedStore
-                                ForEach(store.posts, id: \.id) { post in
-                                    Card {
-                                        PostCardView(post: post)
+                                // Badge indicator for active filters
+                                if feedFilters.hasActiveFilters {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color.blue)
+                                            .frame(width: 20, height: 20)
+                                        
+                                        Text("\(feedFilters.activeFilterCount)")
+                                            .font(.system(size: 12, weight: .bold))
+                                            .foregroundColor(.white)
                                     }
                                 }
                             }
                         }
-
-                        Spacer(minLength: 24)
+                        .buttonStyle(.plain)
                     }
-                    .padding(.horizontal, 16) // inset all feed content
-                    .padding(.top, 16)
-                    // Add bottom padding to ensure last content is not obscured by the global bottom bar.
-                    .padding(.bottom, 120)
+                    .padding(.bottom, 8)
+                    
+                    // Check BOTH sample posts and real sessions
+                    if filteredSessions.isEmpty && store.posts.isEmpty {
+                        EmptyFeedCard(
+                            onFindFriends: { print("Find Friends tapped") },
+                            onLogSession: {
+                                Task { @MainActor in
+                                    router.navigate(.logSession)
+                                }
+                            }
+                        )
+                    } else {
+                        VStack(spacing: 12) {
+                            // FIRST: Show real user sessions from SessionStore (filter out empty/invalid ones)
+                            ForEach(filteredSessions) { session in
+                                Card {
+                                    SessionCardView(session: session, sessionStore: sessionStore)
+                                }
+                            }
+                            
+                            // THEN: Show sample posts from FeedStore
+                            ForEach(store.posts, id: \.id) { post in
+                                Card {
+                                    PostCardView(post: post)
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(minLength: 24)
                 }
+                .padding(.horizontal, 16) // inset all feed content
+                .padding(.top, 16)
+                // Add bottom padding to ensure last content is not obscured by the global bottom bar.
+                .padding(.bottom, 120)
             }
-            .onAppear {
-                store.loadSample()
-            }
+        }
+        .onAppear {
+            store.loadSample()
+        }
+        .navigationDestination(isPresented: $goToMessages) {
+            MessagingView()
+        }
+        .navigationDestination(isPresented: $goToNotifications) {
+            NotificationsView()
         }
         .navigationTitle("Home")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                HStack(spacing: 12) {
-                    Button(action: { goToMessages = true }) {
-                        Image(systemName: "bubble.left.and.bubble.right")
-                            .font(.system(size: 18))
-                    }
-                    
-                    Button(action: { goToNotifications = true }) {
-                        Image(systemName: "bell")
-                            .font(.system(size: 18))
+            // V2_FEATURE: Messaging and notifications (hidden in V1)
+            if FeatureFlags.messaging || FeatureFlags.notifications {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    HStack(spacing: 12) {
+                        if FeatureFlags.messaging {
+                            Button(action: { goToMessages = true }) {
+                                Image(systemName: "bubble.left.and.bubble.right")
+                                    .font(.system(size: 18))
+                            }
+                        }
+                        
+                        if FeatureFlags.notifications {
+                            Button(action: { goToNotifications = true }) {
+                                Image(systemName: "bell")
+                                    .font(.system(size: 18))
+                            }
+                        }
                     }
                 }
             }
@@ -150,9 +153,21 @@ struct HomeView: View {
     
     /// Apply all active filters to the session list
     private var filteredSessions: [SessionData] {
-        sessionStore.sessions
-            .filter { !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-            .filter { feedFilters.matches(session: $0) }
+        let allSessions = sessionStore.sessions
+        print("🏠 HomeView: Total sessions in store: \(allSessions.count)")
+        
+        let nonEmptySessions = allSessions.filter { !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        print("🏠 HomeView: Sessions with non-empty titles: \(nonEmptySessions.count)")
+        
+        let matchedSessions = nonEmptySessions.filter { feedFilters.matches(session: $0) }
+        print("🏠 HomeView: Sessions after filtering: \(matchedSessions.count)")
+        
+        // Debug: print session types
+        for session in allSessions {
+            print("📝 Session: '\(session.title)' | Type: '\(session.sessionType)' | Date: \(session.date)")
+        }
+        
+        return matchedSessions
     }
 }
 
@@ -179,6 +194,7 @@ struct SessionCardView: View {
     @State private var likeCount: Int = 0
     @State private var commentCount: Int = 0
     @State private var showCommentSheet: Bool = false
+    @State private var showShareSheet: Bool = false
     @State private var newComment: String = ""
     
     var body: some View {
@@ -269,53 +285,75 @@ struct SessionCardView: View {
             Divider()
                 .padding(.vertical, 8)
             
-            HStack(spacing: 0) {
-                // Kudos (Likes)
-                HStack(spacing: 4) {
-                    Image(systemName: "person.2.fill")
-                        .font(.system(size: 12))
-                    Text("\(likeCount) gave kudos")
-                        .font(.system(size: 13))
-                }
-                .foregroundColor(.secondary)
-                
-                Spacer()
-                
-                // Comments
-                Text("\(commentCount) comment\(commentCount == 1 ? "" : "s")")
-                    .font(.system(size: 13))
+            // V2_FEATURE: Social engagement (kudos, comments)
+            // Hidden in V1, will be enabled when FeatureFlags.inAppSocial is true
+            if FeatureFlags.kudosAndComments {
+                HStack(spacing: 0) {
+                    // Kudos (Likes)
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 12))
+                        Text("\(likeCount) gave kudos")
+                            .font(.system(size: 13))
+                    }
                     .foregroundColor(.secondary)
-            }
-            .padding(.bottom, 12)
-            
-            // MARK: - Action Buttons
-            HStack(spacing: 40) {
-                Button(action: {
-                    isLiked.toggle()
-                    likeCount += isLiked ? 1 : -1
-                }) {
-                    VStack(spacing: 4) {
-                        Image(systemName: isLiked ? "hand.thumbsup.fill" : "hand.thumbsup")
-                            .font(.system(size: 24))
-                            .foregroundColor(isLiked ? .orange : .secondary)
-                        Text("Kudos")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
+                    
+                    Spacer()
+                    
+                    // Comments
+                    Text("\(commentCount) comment\(commentCount == 1 ? "" : "s")")
+                        .font(.system(size: 13))
+                        .foregroundColor(.secondary)
                 }
-                .buttonStyle(.plain)
+                .padding(.bottom, 12)
                 
-                Button(action: { showCommentSheet = true }) {
-                    VStack(spacing: 4) {
-                        Image(systemName: "bubble.left")
-                            .font(.system(size: 24))
-                            .foregroundColor(.secondary)
-                        Text("Comment")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
+                // MARK: - Action Buttons (V2)
+                HStack(spacing: 40) {
+                    Button(action: {
+                        isLiked.toggle()
+                        likeCount += isLiked ? 1 : -1
+                    }) {
+                        VStack(spacing: 4) {
+                            Image(systemName: isLiked ? "hand.thumbsup.fill" : "hand.thumbsup")
+                                .font(.system(size: 24))
+                                .foregroundColor(isLiked ? .orange : .secondary)
+                            Text("Kudos")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(.plain)
+                    
+                    Button(action: { showCommentSheet = true }) {
+                        VStack(spacing: 4) {
+                            Image(systemName: "bubble.left")
+                                .font(.system(size: 24))
+                                .foregroundColor(.secondary)
+                            Text("Comment")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.plain)
+                }
+            } else {
+                // V1: Simple share button
+                Button(action: { showShareSheet = true }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 16, weight: .medium))
+                        Text("Share")
+                            .font(.system(size: 15, weight: .medium))
+                    }
+                    .foregroundColor(.blue)
                     .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.blue.opacity(0.1))
+                    )
                 }
                 .buttonStyle(.plain)
             }
@@ -340,6 +378,22 @@ struct SessionCardView: View {
                 .navigationTitle("Comments")
             }
         }
+        .sheet(isPresented: $showShareSheet) {
+            ShareCardView(previewStore: sessionDataToPreviewStore(session))
+        }
+    }
+    
+    /// Convert SessionData to PreviewStore for sharing
+    private func sessionDataToPreviewStore(_ session: SessionData) -> PreviewStore {
+        let previewStore = PreviewStore()
+        previewStore.title = session.title
+        previewStore.date = session.date
+        previewStore.location = session.location
+        previewStore.sessionType = session.sessionType
+        previewStore.details = session.details
+        previewStore.isPublic = session.isPublic
+        // Note: Images are stored as filenames, would need to load them if needed for preview
+        return previewStore
     }
     
     // MARK: - Stats Grid (inspired by Strava's Distance/Pace/Time layout)

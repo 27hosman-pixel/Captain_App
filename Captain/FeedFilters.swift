@@ -161,28 +161,36 @@ final class FeedFilters: ObservableObject {
     // MARK: - Filtering Logic
     
     func matches(session: SessionData) -> Bool {
+        print("🔍 Filtering session: '\(session.title)' (type: '\(session.sessionType)')")
+        print("   Current filters - Activity: \(activityTypes), Date: \(dateRange.displayName), Source: \(source.displayName)")
+        
         // Check activity type
         if !activityTypes.contains(.all) {
             let sessionTypeMatches = activityTypes.contains { filter in
                 session.sessionType.lowercased().contains(filter.rawValue.lowercased())
             }
             if !sessionTypeMatches {
+                print("   ❌ Failed activity type filter")
                 return false
             }
+            print("   ✅ Activity type filter passed")
+        } else {
+            print("   ✅ Activity type filter: ALL (pass)")
         }
         
         // Check date range
         if !dateRange.matches(date: session.date) {
+            print("   ❌ Failed date range filter: \(dateRange.displayName)")
             return false
+        } else {
+            print("   ✅ Date range filter passed: \(dateRange.displayName)")
         }
         
-        // Check source (for now, all sessions are "my activities")
-        // When you add friends, you'd check session.origin here
-        if source == .myActivities {
-            // All current sessions are user's activities
-            return true
-        }
+        // Check source - FIX: Should pass for both Everyone and My Activities
+        // Since all current sessions are the user's own posts
+        print("   ✅ Source filter passed: \(source.displayName)")
         
+        print("   ✅✅✅ ALL FILTERS PASSED - Session should display!")
         return true
     }
     

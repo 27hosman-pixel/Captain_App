@@ -138,6 +138,10 @@ struct ContentView: View {
                     selectedTab = .log
                     logPath.append(Destination.preview)
                 }
+                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToHome"))) { _ in
+                    selectedTab = .home
+                    clearAllPaths()
+                }
             }
         }
         .environmentObject(router)
@@ -238,6 +242,8 @@ struct ContentView: View {
                 LogWorkoutView()
             case .preview:
                 SessionPreviewView()
+            case .drafts:
+                DraftsView()
             case .activities:
                 ActivitiesView()
             case .statistics:
