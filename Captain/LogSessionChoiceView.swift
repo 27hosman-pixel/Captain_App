@@ -2,111 +2,170 @@ import SwiftUI
 
 struct LogSessionChoiceView: View {
     var body: some View {
-        VStack(spacing: Theme.Spacing.lg) {
-            // Large title with consistent typography
-            Text("Log New Session")
-                .font(Theme.Typography.largeTitle)
-                .foregroundColor(Theme.Colors.text)
-                .padding(.top, Theme.Spacing.lg)
-
-            // Subtitle with secondary color
-            Text("Choose the type of session you want to log")
-                .font(Theme.Typography.subheadline)
-                .foregroundColor(Theme.Colors.secondaryText)
-
-            Spacer()
-
-            // Session type options with consistent 8pt spacing
-            VStack(spacing: Theme.Spacing.md) {
-                SessionOptionButton(
-                    icon: "sportscourt",
-                    title: "Practice",
-                    subtitle: "Log a team practice session",
-                    action: {
-                        print("[LogChoice] post NavigateToLogPractice")
-                        NotificationCenter.default.post(
-                            name: Notification.Name("NavigateToLogPractice"),
-                            object: nil
+        ScrollView {
+            VStack(spacing: Theme.Spacing.lg) {
+                // Hero section with motivational text
+                VStack(spacing: Theme.Spacing.xs) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 56))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue, .cyan],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         )
-                    }
-                )
+                        .padding(.top, Theme.Spacing.xl)
+                    
+                    Text("What did you do today?")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(Theme.Colors.text)
+                        .padding(.top, Theme.Spacing.sm)
+                    
+                    Text("Track your progress and share with teammates")
+                        .font(Theme.Typography.subheadline)
+                        .foregroundColor(Theme.Colors.secondaryText)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, Theme.Spacing.xl)
+                }
+                .padding(.bottom, Theme.Spacing.md)
 
-                SessionOptionButton(
-                    icon: "flag",
-                    title: "Game",
-                    subtitle: "Log a match with stats",
-                    action: {
-                        print("[LogChoice] post NavigateToLogGame")
-                        NotificationCenter.default.post(
-                            name: Notification.Name("NavigateToLogGame"),
-                            object: nil
-                        )
-                    }
-                )
+                // Session type options with enhanced cards
+                VStack(spacing: Theme.Spacing.md) {
+                    SessionOptionCard(
+                        icon: "sportscourt",
+                        title: "Practice",
+                        subtitle: "Log a team practice session",
+                        gradientColors: [Color.blue, Color.blue.opacity(0.7)],
+                        action: {
+                            print("[LogChoice] post NavigateToLogPractice")
+                            NotificationCenter.default.post(
+                                name: Notification.Name("NavigateToLogPractice"),
+                                object: nil
+                            )
+                        }
+                    )
 
-                SessionOptionButton(
-                    icon: "figure.walk",
-                    title: "Individual Workout",
-                    subtitle: "Log a solo training session",
-                    action: {
-                        print("[LogChoice] post NavigateToLogWorkout")
-                        NotificationCenter.default.post(
-                            name: Notification.Name("NavigateToLogWorkout"),
-                            object: nil
-                        )
-                    }
-                )
+                    SessionOptionCard(
+                        icon: "flag",
+                        title: "Game",
+                        subtitle: "Log a match with stats",
+                        gradientColors: [Color.orange, Color.red.opacity(0.8)],
+                        action: {
+                            print("[LogChoice] post NavigateToLogGame")
+                            NotificationCenter.default.post(
+                                name: Notification.Name("NavigateToLogGame"),
+                                object: nil
+                            )
+                        }
+                    )
+
+                    SessionOptionCard(
+                        icon: "figure.walk",
+                        title: "Individual Workout",
+                        subtitle: "Log a solo training session",
+                        gradientColors: [Color.green, Color.teal.opacity(0.8)],
+                        action: {
+                            print("[LogChoice] post NavigateToLogWorkout")
+                            NotificationCenter.default.post(
+                                name: Notification.Name("NavigateToLogWorkout"),
+                                object: nil
+                            )
+                        }
+                    )
+                }
+                .padding(.horizontal, Theme.Spacing.md)
+                
+                Spacer(minLength: Theme.Spacing.xl)
             }
-            .padding(.horizontal, Theme.Spacing.md)
-
-            Spacer()
         }
-        .navigationTitle("New Session")
+        .navigationTitle("Log Session")
+        .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 20)
+        }
     }
 }
 
-// MARK: - Session Option Button Component
+// MARK: - Enhanced Session Option Card Component
 
-private struct SessionOptionButton: View {
+private struct SessionOptionCard: View {
     let icon: String
     let title: String
     let subtitle: String
+    let gradientColors: [Color]
     let action: () -> Void
+    
+    @State private var isPressed = false
     
     var body: some View {
         Button(action: action) {
-            HStack(spacing: Theme.Spacing.md) {
-                // Icon container
-                Image(systemName: icon)
-                    .font(.system(size: Theme.IconSize.lg, weight: .medium))
-                    .foregroundColor(Theme.Colors.primary)
-                    .frame(width: 36, height: 36)
-
-                // Text content
-                VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
-                    Text(title)
-                        .font(Theme.Typography.headline)
-                        .foregroundColor(Theme.Colors.text)
+            ZStack(alignment: .leading) {
+                // Background gradient
+                LinearGradient(
+                    colors: gradientColors,
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .cornerRadius(Theme.CornerRadius.lg)
+                
+                // Content
+                HStack(spacing: Theme.Spacing.md) {
+                    // Large icon with circular background
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.25))
+                            .frame(width: 64, height: 64)
+                        
+                        Image(systemName: icon)
+                            .font(.system(size: 32, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
                     
-                    Text(subtitle)
-                        .font(Theme.Typography.caption)
-                        .foregroundColor(Theme.Colors.secondaryText)
+                    // Text content
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(title)
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundColor(.white)
+                        
+                        Text(subtitle)
+                            .font(.system(size: 15))
+                            .foregroundColor(.white.opacity(0.9))
+                    }
+                    
+                    Spacer()
+                    
+                    // Chevron indicator
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.8))
                 }
-                
-                Spacer()
-                
-                // Chevron indicator
-                Image(systemName: "chevron.right")
-                    .font(.system(size: Theme.IconSize.sm, weight: .medium))
-                    .foregroundColor(Theme.Colors.secondaryText)
+                .padding(Theme.Spacing.md)
             }
-            .padding(Theme.Spacing.md)
-            .background(
-                RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                    .fill(Color(.systemGray6))
+            .frame(height: 100)
+            .shadow(
+                color: gradientColors[0].opacity(0.4),
+                radius: isPressed ? 4 : 12,
+                x: 0,
+                y: isPressed ? 2 : 8
             )
+            .scaleEffect(isPressed ? 0.98 : 1.0)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CardButtonStyle(isPressed: $isPressed))
+    }
+}
+
+// Custom button style for press animation
+private struct CardButtonStyle: ButtonStyle {
+    @Binding var isPressed: Bool
+    
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .onChange(of: configuration.isPressed) { newValue in
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    isPressed = newValue
+                }
+            }
     }
 }
 

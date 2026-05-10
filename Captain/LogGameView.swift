@@ -51,204 +51,211 @@ struct LogGameView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 0) {
-                LogHeroHeader(
-                    title: "Log Game",
-                    subtitle: "Record match stats, health data, media and notes."
-                )
+            VStack(spacing: 24) {
+                // Core info
+                VStack(alignment: .leading, spacing: 16) {
+                    ModernSectionHeader("Match")
 
-                VStack(spacing: 16) {
-                    // Core info
-                    Card {
-                        VStack(alignment: .leading, spacing: 12) {
-                            SectionHeader("Match")
+                    VStack(spacing: 12) {
+                        ModernField(label: "Title") {
+                            TextField("E.g. Saturday League Match", text: $title)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                        }
+                        
+                        ModernField(label: "Opponent") {
+                            TextField("Opponent Team", text: $opponent)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                        }
+                        
+                        ModernField(label: "Final Score") {
+                            TextField("e.g. 3-1", text: $finalScore)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                        }
 
-                            Group {
-                                LabeledField(label: "Title") {
-                                    TextField("E.g. Saturday League Match", text: $title)
-                                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                                }
-                                LabeledField(label: "Opponent") {
-                                    TextField("Opponent Team", text: $opponent)
-                                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                                }
-                                LabeledField(label: "Final Score") {
-                                    TextField("e.g. 3-1", text: $finalScore)
-                                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                                }
-                            }
+                        ModernField(label: "Date & Time") {
+                            DatePicker("", selection: $date, displayedComponents: [.date, .hourAndMinute])
+                                .labelsHidden()
+                        }
 
-                            HStack(spacing: 16) {
-                                VStack(alignment: .leading) {
-                                    Text("Date & Time").font(.caption).foregroundColor(.secondary)
-                                    DatePicker("", selection: $date, displayedComponents: [.date, .hourAndMinute])
-                                        .labelsHidden()
-                                }
-                                Spacer()
-                            }
-
-                            LabeledField(label: "Location") {
-                                TextField("Stadium / Field", text: $location)
-                                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                            }
+                        ModernField(label: "Location") {
+                            TextField("Stadium / Field", text: $location)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
                         }
                     }
-                    .padding(.horizontal)
-
-                    // Stats
-                    Card {
-                        VStack(alignment: .leading, spacing: 12) {
-                            SectionHeader("Match Stats")
-
-                            HStack(spacing: 12) {
-                                NumberField(title: "Minutes", text: $minutesPlayedText)
-                                NumberField(title: "Goals", text: $goalsText)
-                                NumberField(title: "Assists", text: $assistsText)
-                                NumberField(title: "Tackles", text: $tacklesText)
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-
-                    // Custom stats
-                    Card {
-                        VStack(alignment: .leading, spacing: 10) {
-                            SectionHeader("Custom Stats")
-
-                            if customStats.isEmpty {
-                                EmptyHint("Add any stat you want to track.")
-                            } else {
-                                ForEach(Array(customStats.enumerated()), id: \.offset) { index, stat in
-                                    HStack {
-                                        Text(stat.name)
-                                        Spacer()
-                                        Text(stat.value)
-                                        Button(role: .destructive) {
-                                            customStats.remove(at: index)
-                                        } label: {
-                                            Image(systemName: "trash")
-                                        }
-                                        .buttonStyle(.borderless)
-                                    }
-                                    .padding(8)
-                                    .background(Color(.systemGray6))
-                                    .cornerRadius(8)
-                                }
-                            }
-
-                            HStack(spacing: 8) {
-                                TextField("Stat name (e.g. Sprints)", text: $newStatName)
-                                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                                TextField("Value", text: $newStatValue)
-                                    .frame(width: 90)
-                                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                                Button {
-                                    let name = newStatName.trimmingCharacters(in: .whitespacesAndNewlines)
-                                    let value = newStatValue.trimmingCharacters(in: .whitespacesAndNewlines)
-                                    guard !name.isEmpty && !value.isEmpty else { return }
-                                    customStats.append(CustomStat(name: name, value: value))
-                                    newStatName = ""
-                                    newStatValue = ""
-                                } label: {
-                                    Image(systemName: "plus.circle.fill").font(.title3)
-                                }
-                                .buttonStyle(.borderless)
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-
-                    // Health
-                    Card {
-                        VStack(alignment: .leading, spacing: 10) {
-                            SectionHeader("Health Data")
-
-                            HStack(spacing: 12) {
-                                VStack(alignment: .leading) {
-                                    Text("Total Miles").font(.caption2).foregroundColor(.secondary)
-                                    TextField("e.g. 5.2", text: $totalMilesText)
-                                        .keyboardType(.decimalPad)
-                                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                                }
-
-                                VStack(alignment: .leading) {
-                                    Text("Avg Heart Rate").font(.caption2).foregroundColor(.secondary)
-                                    TextField("e.g. 142", text: $avgHeartRateText)
-                                        .keyboardType(.numberPad)
-                                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-
-                    // Media
-                    Card {
-                        VStack(alignment: .leading, spacing: 10) {
-                            SectionHeader("Media")
-
-                            PhotosPicker(selection: $selectedItems, maxSelectionCount: 6, matching: .images) {
-                                AddMediaButton()
-                            }
-                            .onChange(of: selectedItems) { _, newItems in
-                                Task {
-                                    selectedImages = []
-                                    for item in newItems {
-                                        if let data = try? await item.loadTransferable(type: Data.self),
-                                           let ui = UIImage(data: data) {
-                                            selectedImages.append(ui)
-                                        }
-                                    }
-                                }
-                            }
-
-                            if !selectedImages.isEmpty {
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 10) {
-                                        ForEach(selectedImages, id: \.self) { img in
-                                            MediaThumb(image: img)
-                                        }
-                                    }
-                                    .padding(.vertical, 4)
-                                }
-                            } else {
-                                EmptyHint("Add photos or clips from your game.")
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-
-                    // Notes + footer actions
-                    Card {
-                        VStack(alignment: .leading, spacing: 12) {
-                            SectionHeader("Notes")
-                            TextEditor(text: $notes)
-                                .frame(minHeight: 120)
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(.systemGray4)))
-
-                            Divider().padding(.vertical, 4)
-
-                            FooterActions(isPublic: $isPublic, onCancel: {
-                                router.hideSidebar()
-                                router.popToRoot()
-                            }, onPreview: saveSession)
-                        }
-                    }
-                    .padding(.horizontal)
-
-                    Spacer(minLength: 24)
                 }
-                .padding(.top, 12)
+                .padding(.horizontal)
+
+                // Stats
+                VStack(alignment: .leading, spacing: 16) {
+                    ModernSectionHeader("Match Stats")
+
+                    HStack(spacing: 12) {
+                        NumberField(title: "Minutes", text: $minutesPlayedText)
+                        NumberField(title: "Goals", text: $goalsText)
+                        NumberField(title: "Assists", text: $assistsText)
+                        NumberField(title: "Tackles", text: $tacklesText)
+                    }
+                }
+                .padding(.horizontal)
+
+                // Custom stats
+                VStack(alignment: .leading, spacing: 16) {
+                    ModernSectionHeader("Custom Stats")
+
+                    VStack(spacing: 10) {
+                        if customStats.isEmpty {
+                            EmptyHint("Add any stat you want to track.")
+                        } else {
+                            ForEach(Array(customStats.enumerated()), id: \.offset) { index, stat in
+                                HStack {
+                                    Text(stat.name)
+                                    Spacer()
+                                    Text(stat.value)
+                                    Button(role: .destructive) {
+                                        customStats.remove(at: index)
+                                    } label: {
+                                        Image(systemName: "trash")
+                                    }
+                                    .buttonStyle(.borderless)
+                                }
+                                .padding(12)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(10)
+                            }
+                        }
+
+                        HStack(spacing: 8) {
+                            TextField("Stat name (e.g. Sprints)", text: $newStatName)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                            TextField("Value", text: $newStatValue)
+                                .frame(width: 90)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                            Button {
+                                let name = newStatName.trimmingCharacters(in: .whitespacesAndNewlines)
+                                let value = newStatValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                                guard !name.isEmpty && !value.isEmpty else { return }
+                                customStats.append(CustomStat(name: name, value: value))
+                                newStatName = ""
+                                newStatValue = ""
+                            } label: {
+                                Image(systemName: "plus.circle.fill").font(.title2)
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
+                }
+                .padding(.horizontal)
+
+                // Health
+                VStack(alignment: .leading, spacing: 16) {
+                    ModernSectionHeader("Health Data")
+
+                    VStack(spacing: 12) {
+                        ModernField(label: "Total Miles") {
+                            TextField("e.g. 5.2", text: $totalMilesText)
+                                .keyboardType(.decimalPad)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                        }
+
+                        ModernField(label: "Avg Heart Rate") {
+                            TextField("e.g. 142", text: $avgHeartRateText)
+                                .keyboardType(.numberPad)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                        }
+                    }
+                }
+                .padding(.horizontal)
+
+                // Media
+                VStack(alignment: .leading, spacing: 16) {
+                    ModernSectionHeader("Media")
+
+                    VStack(spacing: 12) {
+                        PhotosPicker(selection: $selectedItems, maxSelectionCount: 6, matching: .images) {
+                            ModernMediaButton()
+                        }
+                        .onChange(of: selectedItems) { _, newItems in
+                            Task {
+                                selectedImages = []
+                                for item in newItems {
+                                    if let data = try? await item.loadTransferable(type: Data.self),
+                                       let ui = UIImage(data: data) {
+                                        selectedImages.append(ui)
+                                    }
+                                }
+                            }
+                        }
+
+                        if !selectedImages.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 10) {
+                                    ForEach(selectedImages, id: \.self) { img in
+                                        MediaThumb(image: img)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal)
+
+                // Notes
+                VStack(alignment: .leading, spacing: 16) {
+                    ModernSectionHeader("Notes")
+
+                    TextEditor(text: $notes)
+                        .frame(minHeight: 120)
+                        .padding(4)
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(.systemGray4)))
+                }
+                .padding(.horizontal)
+
+                // Footer actions
+                VStack(spacing: 12) {
+                    Toggle(isOn: $isPublic) {
+                        HStack {
+                            Image(systemName: isPublic ? "globe" : "lock.fill")
+                            Text(isPublic ? "Public" : "Private")
+                        }
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(10)
+
+                    Button(action: saveSession) {
+                        Text("Save Game")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .cornerRadius(12)
+                    }
+
+                    Button(action: {
+                        router.hideSidebar()
+                        router.popToRoot()
+                    }) {
+                        Text("Cancel")
+                            .foregroundColor(.red)
+                    }
+                }
+                .padding(.horizontal)
+
+                Spacer(minLength: 40)
             }
+            .padding(.top, 20)
+            .padding(.bottom, 100)
         }
+        .navigationTitle("Log Game")
+        .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             isPublic = defaultSessionPublic
         }
-        .navigationTitle("Game")
     }
 
     private func saveSession() {
-        // Dismiss keyboard
+        // Dismiss keyboard so the tap isn't blocked and UI updates proceed
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
 
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -288,69 +295,25 @@ struct LogGameView: View {
     }
 }
 
-// MARK: - Shared styling components (copied here so this file builds standalone)
+// MARK: - Modern Styling Components
 
-private struct LogHeroHeader: View {
-    let title: String
-    let subtitle: String
-
-    var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            LinearGradient(
-                colors: [Color.blue.opacity(0.85), Color.blue.opacity(0.55)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .frame(height: 140)
-            .overlay(
-                RoundedRectangle(cornerRadius: 0)
-                    .fill(LinearGradient(colors: [Color.white.opacity(0.08), Color.clear], startPoint: .top, endPoint: .bottom))
-            )
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text(title)
-                    .font(.system(size: 26, weight: .bold))
-                    .foregroundColor(.white)
-                    .shadow(color: .black.opacity(0.2), radius: 6, x: 0, y: 2)
-
-                Text(subtitle)
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.9))
-                    .lineLimit(2)
-            }
-            .padding(.leading, 20)
-            .padding(.bottom, 14)
-        }
-    }
-}
-
-private struct Card<Content: View>: View {
-    @ViewBuilder var content: Content
-    var body: some View {
-        content
-            .padding()
-            .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.separator)))
-            .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 4)
-    }
-}
-
-private struct SectionHeader: View {
+private struct ModernSectionHeader: View {
     let text: String
     init(_ text: String) { self.text = text }
     var body: some View {
         Text(text)
-            .font(.headline)
+            .font(.system(size: 20, weight: .bold))
+            .foregroundColor(.primary)
     }
 }
 
-private struct LabeledField<Content: View>: View {
+private struct ModernField<Content: View>: View {
     let label: String
     @ViewBuilder var content: Content
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(label)
-                .font(.caption)
+                .font(.subheadline)
                 .foregroundColor(.secondary)
             content
         }
@@ -382,20 +345,24 @@ private struct EmptyHint: View {
             Spacer()
         }
         .font(.caption)
-        .padding(8)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color(.systemGray6)))
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color(.systemGray6)))
     }
 }
 
-private struct AddMediaButton: View {
+private struct ModernMediaButton: View {
     var body: some View {
         HStack {
-            Image(systemName: "photo.on.rectangle")
-            Text("Add Photos/Videos")
+            Image(systemName: "photo")
+                .font(.system(size: 28))
+            Text("Add Photos/Video")
+                .font(.headline)
             Spacer()
         }
-        .padding()
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color(.systemGray6)))
+        .foregroundColor(.white)
+        .padding(20)
+        .background(Color(.systemGray4))
+        .cornerRadius(12)
     }
 }
 
@@ -409,39 +376,6 @@ private struct MediaThumb: View {
             .clipped()
             .cornerRadius(10)
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(.separator)))
-    }
-}
-
-private struct FooterActions: View {
-    @Binding var isPublic: Bool
-    var onCancel: () -> Void
-    var onPreview: () -> Void
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Button(action: onCancel) {
-                Text("Cancel")
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(RoundedRectangle(cornerRadius: 12).stroke(Color(.systemGray4)))
-            }
-
-            VStack(spacing: 8) {
-                Toggle(isOn: $isPublic) {
-                    Text(isPublic ? "Public" : "Private")
-                        .font(.caption)
-                }
-                .toggleStyle(.switch)
-
-                Button(action: onPreview) {
-                    Text("Preview")
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(RoundedRectangle(cornerRadius: 12).fill(Color.blue))
-                }
-            }
-        }
     }
 }
 

@@ -146,6 +146,25 @@ final class SessionStore: ObservableObject {
         sessions = []
         save()
     }
+    
+    func delete(session: SessionData) {
+        // Remove associated image files
+        guard let docs = documentsDirectory() else { return }
+        for fileName in session.imageFileNames {
+            let url = docs.appendingPathComponent(fileName)
+            if FileManager.default.fileExists(atPath: url.path) {
+                do {
+                    try FileManager.default.removeItem(at: url)
+                } catch {
+                    print("Failed to delete image file \(fileName):", error)
+                }
+            }
+        }
+        
+        // Remove session from array
+        sessions.removeAll { $0.id == session.id }
+        save()
+    }
 
     // MARK: - Settings helpers
 

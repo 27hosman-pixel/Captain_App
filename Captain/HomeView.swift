@@ -18,10 +18,7 @@ final class FeedStore: ObservableObject {
     @Published var posts: [Post] = []
 
     func loadSample() {
-        posts = [
-            Post(author: "riya_tad", timeAgo: "3:47 pm", title: "Game vs. Hinsdale Central (3-1 W)", imageNames: [], goals: 3, assists: 1, minutesPlayed: 90, likes: 12, comments: 3),
-            Post(author: "coach_mike", timeAgo: "Yesterday", title: "Practice: Small-sided drills", imageNames: [], goals: 0, assists: 2, minutesPlayed: 60, likes: 4, comments: 1)
-        ]
+        posts = []
     }
 
     func clear() {
@@ -54,11 +51,6 @@ struct HomeView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
-                    HomeHeroHeader(
-                        onMessages: { goToMessages = true },
-                        onNotifications: { goToNotifications = true }
-                    )
-
                     // apply consistent content inset to avoid leading clipping
                     VStack(spacing: 16) {
                         // Check BOTH sample posts and real sessions
@@ -120,7 +112,7 @@ struct HomeView: View {
                         Spacer(minLength: 24)
                     }
                     .padding(.horizontal, 16) // inset all feed content
-                    .padding(.top, 12)
+                    .padding(.top, 16)
                     // Add bottom padding to ensure last content is not obscured by the global bottom bar.
                     .padding(.bottom, 120)
                 }
@@ -130,9 +122,27 @@ struct HomeView: View {
             }
         }
         .navigationTitle("Home")
-        .toolbar { }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                HStack(spacing: 12) {
+                    Button(action: { goToMessages = true }) {
+                        Image(systemName: "bubble.left.and.bubble.right")
+                            .font(.system(size: 18))
+                    }
+                    
+                    Button(action: { goToNotifications = true }) {
+                        Image(systemName: "bell")
+                            .font(.system(size: 18))
+                    }
+                }
+            }
+        }
         .sheet(isPresented: $showFilterSheet) {
             FilterSheetView(filters: feedFilters)
+        }
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 20)
         }
     }
     
@@ -147,77 +157,6 @@ struct HomeView: View {
 }
 
 // MARK: - Restored subviews needed by HomeView
-
-private struct HomeHeroHeader: View {
-    var onMessages: () -> Void
-    var onNotifications: () -> Void
-
-    var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            LinearGradient(
-                colors: [Color.blue.opacity(0.85), Color.blue.opacity(0.55)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .frame(height: 140)
-            .overlay(
-                RoundedRectangle(cornerRadius: 0)
-                    .fill(LinearGradient(colors: [Color.white.opacity(0.08), Color.clear], startPoint: .top, endPoint: .bottom))
-            )
-
-            VStack {
-                HStack {
-                    Spacer()
-                    HStack(spacing: 10) {
-                        HeaderIconButton(systemName: "bubble.left.and.bubble.right", action: onMessages)
-                        HeaderIconButton(systemName: "bell", action: onNotifications)
-                    }
-                }
-                .padding(.top, 8)
-                .padding(.horizontal, 12)
-
-                Spacer()
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Captain")
-                        .font(.system(size: 26, weight: .bold))
-                        .foregroundColor(.white)
-                        .shadow(color: .black.opacity(0.2), radius: 6, x: 0, y: 2)
-
-                    Text("See updates from you and your teammates")
-                        .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.9))
-                        .lineLimit(2)
-                }
-                .padding(.leading, 0)
-                .padding(.bottom, 14)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.horizontal, 16)
-        }
-    }
-}
-
-private struct HeaderIconButton: View {
-    let systemName: String
-    var action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 18))
-                .foregroundColor(.white)
-                .padding(8)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.white.opacity(0.25), lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(systemName == "bell" ? "Notifications" : "Messages")
-    }
-}
 
 private struct Card<Content: View>: View {
     @ViewBuilder var content: Content
@@ -735,14 +674,15 @@ private struct EmptyFeedCard: View {
         Card {
             VStack(spacing: 16) {
                 HStack {
-                    Text("Your Feed")
+                    Text("Connect with Friends")
                         .font(.headline)
                     Spacer()
                 }
 
                 HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "info.circle")
-                        .foregroundColor(.secondary)
+                    Image(systemName: "person.2.circle")
+                        .font(.system(size: 40))
+                        .foregroundColor(.blue)
                         .padding(.top, 2)
 
                     VStack(alignment: .leading, spacing: 8) {

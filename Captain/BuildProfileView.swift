@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import UIKit
 
 struct PlayerProfile: Codable {
     var firstName: String = ""
@@ -18,6 +19,8 @@ struct PlayerProfile: Codable {
     var goalsDay: String = ""
     var goalsWeek: String = ""
     var goalsSeason: String = ""
+    // profile photo filename
+    var profilePhotoFilename: String?
 }
 
 final class ProfileStore: ObservableObject {
@@ -41,8 +44,61 @@ final class ProfileStore: ObservableObject {
     }
 
     func clear() {
+        // Delete profile photo if exists
+        if let filename = profile.profilePhotoFilename {
+            deleteProfilePhoto(filename: filename)
+        }
         profile = PlayerProfile()
         UserDefaults.standard.removeObject(forKey: key)
+    }
+    
+    // MARK: - Profile Photo Management
+    
+    func setProfilePhoto(_ image: UIImage) {
+        // Delete old photo if exists
+        if let oldFilename = profile.profilePhotoFilename {
+            deleteProfilePhoto(filename: oldFilename)
+        }
+        
+        // Save new photo
+        let filename = "profile_\(UUID().uuidString).jpg"
+        if saveProfilePhoto(image, filename: filename) {
+            profile.profilePhotoFilename = filename
+            save()
+        }
+    }
+    
+    func getProfilePhoto() -> UIImage? {
+        guard let filename = profile.profilePhotoFilename else { return nil }
+        return loadProfilePhoto(filename: filename)
+    }
+    
+    private func saveProfilePhoto(_ image: UIImage, filename: String) -> Bool {
+        guard let data = image.jpegData(compressionQuality: 0.8) else { return false }
+        let url = profilePhotoURL(filename: filename)
+        do {
+            try data.write(to: url)
+            return true
+        } catch {
+            print("Failed to save profile photo: \(error)")
+            return false
+        }
+    }
+    
+    private func loadProfilePhoto(filename: String) -> UIImage? {
+        let url = profilePhotoURL(filename: filename)
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return UIImage(data: data)
+    }
+    
+    private func deleteProfilePhoto(filename: String) {
+        let url = profilePhotoURL(filename: filename)
+        try? FileManager.default.removeItem(at: url)
+    }
+    
+    private func profilePhotoURL(filename: String) -> URL {
+        let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return documentsDir.appendingPathComponent(filename)
     }
 }
 
