@@ -17,9 +17,10 @@ struct ProfileView: View {
                         position: store.profile.position,
                         location: store.profile.location
                     )
+                    .padding(.top, 6)
 
                     // Content card stack
-                    VStack(spacing: 16) {
+                    VStack(spacing: Theme.Spacing.md) {
                         // Overlapping avatar
                         AvatarView()
                             .offset(y: -48)
@@ -29,10 +30,8 @@ struct ProfileView: View {
                         StatCardsRow(
                             followers: store.profile.followers,
                             activities: sessionStore.sessions.count,
-                            following: store.profile.following,
-                            onActivitiesTap: { router.navigate(.activities) }
+                            following: store.profile.following
                         )
-                        .padding(.horizontal)
 
                         // Goals summary row
                         GoalsRow(
@@ -41,7 +40,6 @@ struct ProfileView: View {
                             season: store.profile.goalsSeason,
                             onEdit: { showingGoals = true }
                         )
-                        .padding(.horizontal)
 
                         // About grid
                         AboutCard(
@@ -58,22 +56,30 @@ struct ProfileView: View {
                                 }
                             }
                         )
-                        .padding(.horizontal)
 
                         // Recent activity
                         RecentActivitySection(
                             sparkValues: recentSessionCounts(),
                             images: recentImages(),
-                            onViewAll: { router.navigate(.activities) },
                             onAdd: { router.navigate(.logSession) }
                         )
-                        .padding(.horizontal)
 
                         // Quick actions
-                        QuickActions(
-                            onActivities: { router.navigate(.activities) },
-                            onGoals: { showingGoals = true },
-                            onShare: {
+                        HStack(spacing: Theme.Spacing.sm) {
+                            // Activities - use NavigationLink for tab navigation
+                            NavigationLink(value: Destination.activities) {
+                                ActionTileContent(title: "Activities", system: "list.bullet.rectangle")
+                            }
+                            .buttonStyle(.plain)
+                            
+                            // Goals - uses local state
+                            Button(action: { showingGoals = true }) {
+                                ActionTileContent(title: "Goals", system: "target")
+                            }
+                            .buttonStyle(.plain)
+                            
+                            // Share - uses action
+                            Button(action: {
                                 shareProfile()
                                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                                     showShareToast = true
@@ -81,53 +87,26 @@ struct ProfileView: View {
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
                                     withAnimation(.easeInOut) { showShareToast = false }
                                 }
+                            }) {
+                                ActionTileContent(title: "Share", system: "square.and.arrow.up")
                             }
-                        )
-                        .padding(.horizontal)
+                            .buttonStyle(.plain)
+                        }
 
-                        Spacer(minLength: 24)
+                        Spacer(minLength: Theme.Spacing.lg)
                     }
-                    .padding(.top, 12)
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .padding(.top, Theme.Spacing.sm)
+                    .padding(.bottom, Theme.Spacing.md)
                 }
             }
             .navigationTitle("My Profile")
+            .navigationBarTitleDisplayMode(.inline)
             .onAppear {
                 store.load()
             }
-
-            // Always-visible floating hamburger button in top-left (in-content)
-            Button(action: {
-                NotificationCenter.default.post(name: Notification.Name("ToggleSidebar"), object: nil)
-            }) {
-                Image(systemName: "line.horizontal.3")
-                    .foregroundColor(.primary)
-                    .padding(10)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
-            }
-            .padding(.top, 8)
-            .padding(.leading, 8)
-            .accessibilityLabel("Open menu")
-
-            // Bottom bar overlay
-            VStack {
-                Spacer()
-                BottomBarView()
-                    .environmentObject(router)
-                    .padding(.bottom, 0)
-            }
-            .edgesIgnoringSafeArea(.bottom)
         }
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button(action: {
-                    NotificationCenter.default.post(name: Notification.Name("ToggleSidebar"), object: nil)
-                }) {
-                    Image(systemName: "line.horizontal.3")
-                        .imageScale(.large)
-                }
-            }
-        }
-        // Goals editor sheet (kept from your original)
+        // Goals editor sheet
         .sheet(isPresented: $showingGoals) {
             NavigationView {
                 Form {
@@ -166,10 +145,13 @@ struct ProfileView: View {
                     .padding(.top, 8)
             }
         }
+        // Reserve space above the global bottom bar so content isn't blocked
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 20)
+        }
     }
 
-    // MARK: - Existing helpers preserved
-
+    // MARK: - Helpers (unchanged)
     private func displayName() -> String {
         let f = store.profile.firstName.trimmingCharacters(in: .whitespacesAndNewlines)
         let l = store.profile.lastName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -236,7 +218,7 @@ struct ProfileView: View {
     }
 }
 
-// MARK: - Subviews
+// MARK: - Subviews (unchanged visuals; layout-safe tweaks inside)
 
 private struct HeroHeader: View {
     let name: String
@@ -246,23 +228,29 @@ private struct HeroHeader: View {
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             LinearGradient(
-                colors: [Color.blue.opacity(0.85), Color.blue.opacity(0.55)],
+                colors: [Theme.Colors.heroBlue, Theme.Colors.heroBlueLight],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            .frame(height: 160)
+            .frame(height: 200)
             .overlay(
                 RoundedRectangle(cornerRadius: 0)
-                    .fill(LinearGradient(colors: [Color.white.opacity(0.08), Color.clear], startPoint: .top, endPoint: .bottom))
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.08), Color.clear],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
             )
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                 Text(name)
                     .font(.system(size: 28, weight: .bold))
                     .foregroundColor(.white)
                     .shadow(color: .black.opacity(0.2), radius: 6, x: 0, y: 2)
 
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.Spacing.xs) {
                     if !position.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         Chip(text: position, systemName: "figure.soccer")
                     }
@@ -271,9 +259,28 @@ private struct HeroHeader: View {
                     }
                 }
             }
-            .padding(.leading, 24)
-            .padding(.bottom, 16)
+            .padding(.leading, Theme.Spacing.lg)
+            .padding(.bottom, 64)
         }
+    }
+}
+
+private struct Chip: View {
+    let text: String
+    let systemName: String
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.xs) {
+            Image(systemName: systemName)
+                .font(Theme.Typography.caption)
+            Text(text)
+                .font(Theme.Typography.caption)
+        }
+        .padding(.vertical, Theme.Spacing.xs)
+        .padding(.horizontal, Theme.Spacing.sm)
+        .background(Capsule().fill(Color.white.opacity(0.15)))
+        .overlay(Capsule().stroke(Color.white.opacity(0.35)))
+        .foregroundColor(.white)
     }
 }
 
@@ -281,21 +288,21 @@ private struct AvatarView: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(.ultraThinMaterial)
-                .frame(width: 168, height: 168)
-                .overlay(
-                    Circle()
-                        .stroke(LinearGradient(colors: [Color.white.opacity(0.9), Color.white.opacity(0.3)], startPoint: .top, endPoint: .bottom), lineWidth: 2)
+                .fill(
+                    LinearGradient(colors: [Color.blue.opacity(0.15), Color.blue.opacity(0.06)],
+                                   startPoint: .topLeading,
+                                   endPoint: .bottomTrailing)
                 )
-                .shadow(color: Color.black.opacity(0.12), radius: 10, x: 0, y: 6)
-
-            Circle()
-                .strokeBorder(Color.black.opacity(0.85), lineWidth: 5)
-                .frame(width: 156, height: 156)
-                .overlay(Image(systemName: "person.fill").font(.system(size: 64)).foregroundColor(.black))
+                .frame(width: 96, height: 96)
+                .overlay(Circle().stroke(Color(.separator)))
+            Image(systemName: "person.fill")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 44, height: 44)
+                .foregroundColor(.blue)
         }
-        .frame(maxWidth: .infinity)
-        .accessibilityLabel("Profile picture")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Profile avatar")
     }
 }
 
@@ -303,51 +310,40 @@ private struct StatCardsRow: View {
     let followers: Int
     let activities: Int
     let following: Int
-    var onActivitiesTap: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            StatCard(icon: "person.2.fill", title: "Followers", value: followers)
-            Button(action: onActivitiesTap) {
-                StatCard(icon: "list.bullet.rectangle", title: "Activities", value: activities)
+        HStack(spacing: Theme.Spacing.sm) {
+            StatCard(title: "Followers", value: followers)
+            
+            NavigationLink(value: Destination.activities) {
+                StatCard(title: "Activities", value: activities)
             }
             .buttonStyle(.plain)
-            StatCard(icon: "person.crop.circle.badge.plus", title: "Following", value: following)
+            
+            StatCard(title: "Following", value: following)
         }
+        .frame(maxWidth: .infinity, alignment: .center)
     }
-}
 
-private struct StatCard: View {
-    let icon: String
-    let title: String
-    let value: Int
-
-    var body: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Image(systemName: icon)
-                    .foregroundColor(.blue)
-                Spacer()
-            }
-            HStack(alignment: .firstTextBaseline) {
-                Text("\(value)")
-                    .font(.title2).bold()
-                Spacer()
-            }
-            HStack {
-                Text(title)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Spacer()
-            }
+    private func StatCard(title: String, value: Int) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+            Text(title)
+                .font(Theme.Typography.caption)
+                .foregroundColor(Theme.Colors.secondaryText)
+            Text("\(value)")
+                .font(Theme.Typography.title3)
+                .foregroundColor(Theme.Colors.text)
         }
-        .padding()
+        .padding(Theme.Spacing.md)
         .frame(maxWidth: .infinity)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.separator)))
-        .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 4)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(title): \(value)")
+        .background(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                .fill(Theme.Colors.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                .stroke(Theme.Colors.divider, lineWidth: 0.5)
+        )
     }
 }
 
@@ -358,61 +354,39 @@ private struct GoalsRow: View {
     var onEdit: () -> Void
 
     var body: some View {
-        VStack(spacing: 10) {
-            HStack {
-                Text("Goals")
-                    .font(.headline)
-                Spacer()
-                Button(action: onEdit) {
-                    Label("Edit", systemImage: "pencil")
-                        .font(.subheadline.bold())
+        Card {
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                    Text("Goals")
+                        .font(Theme.Typography.headline)
+                        .foregroundColor(Theme.Colors.text)
+                    
+                    HStack(spacing: Theme.Spacing.sm) {
+                        GoalPill(label: "Day", value: day)
+                        GoalPill(label: "Week", value: week)
+                        GoalPill(label: "Season", value: season)
+                    }
                 }
-            }
-
-            HStack(spacing: 8) {
-                GoalPill(title: "Day", value: day)
-                GoalPill(title: "Week", value: week)
-                GoalPill(title: "Season", value: season)
                 Spacer()
+                ThemeEditButton(action: onEdit)
             }
         }
-        .padding()
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemGray6)))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.separator)))
     }
-}
 
-private struct GoalPill: View {
-    let title: String
-    let value: String
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: iconName(for: title))
-                .font(.caption)
-            Text(title)
-                .font(.caption).bold()
-            Text(display(value))
-                .font(.caption)
-                .foregroundColor(.secondary)
+    private func GoalPill(label: String, value: String) -> some View {
+        HStack(spacing: Theme.Spacing.xs) {
+            Text(label)
+                .font(Theme.Typography.caption2)
+                .foregroundColor(Theme.Colors.secondaryText)
+            Text(value.isEmpty ? "—" : value)
+                .font(Theme.Typography.caption)
+                .fontWeight(.bold)
+                .foregroundColor(Theme.Colors.text)
         }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 10)
+        .padding(.vertical, Theme.Spacing.xs)
+        .padding(.horizontal, Theme.Spacing.sm)
         .background(Capsule().fill(Color(.systemBackground)))
-        .overlay(Capsule().stroke(Color(.separator)))
-    }
-
-    private func display(_ v: String) -> String {
-        let t = v.trimmingCharacters(in: .whitespacesAndNewlines)
-        return t.isEmpty ? "—" : t
-    }
-
-    private func iconName(for title: String) -> String {
-        switch title.lowercased() {
-        case "day": return "sun.max.fill"
-        case "week": return "calendar"
-        default: return "flag.fill"
-        }
+        .overlay(Capsule().stroke(Theme.Colors.divider, lineWidth: 0.5))
     }
 }
 
@@ -427,112 +401,94 @@ private struct AboutCard: View {
     var onEdit: () -> Void
 
     var body: some View {
-        VStack(spacing: 12) {
-            HStack {
-                Text("About")
-                    .font(.headline)
-                Spacer()
-                Button(action: onEdit) {
-                    Label("Edit Profile", systemImage: "square.and.pencil")
-                        .font(.subheadline.bold())
+        Card {
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                HStack {
+                    Text("About")
+                        .font(Theme.Typography.headline)
+                        .foregroundColor(Theme.Colors.text)
+                    Spacer()
+                    ThemeEditButton(action: onEdit)
+                }
+
+                LazyVGrid(
+                    columns: [GridItem(.flexible()), GridItem(.flexible())],
+                    spacing: Theme.Spacing.sm
+                ) {
+                    ThemeInfoRow(title: "Date of Birth", value: dob)
+                    ThemeInfoRow(title: "Age", value: age)
+                    ThemeInfoRow(title: "School", value: school)
+                    ThemeInfoRow(title: "Grade", value: grade)
+                    ThemeInfoRow(title: "Location", value: location)
+                    ThemeInfoRow(title: "Position", value: position)
+                    ThemeInfoRow(title: "Club Team", value: club)
                 }
             }
-
-            Divider()
-
-            VStack(spacing: 10) {
-                InfoRow(icon: "calendar", label: "DOB", value: dob)
-                InfoRow(icon: "clock", label: "Age", value: age)
-                InfoRow(icon: "building.2", label: "School", value: school)
-                InfoRow(icon: "graduationcap", label: "Grade", value: grade)
-                InfoRow(icon: "mappin.and.ellipse", label: "Location", value: location)
-                InfoRow(icon: "figure.soccer", label: "Position", value: position)
-                InfoRow(icon: "person.3", label: "Club", value: club)
-            }
         }
-        .padding()
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemGray6)))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.separator)))
     }
 }
 
 private struct InfoRow: View {
-    let icon: String
-    let label: String
+    let title: String
     let value: String
-
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .frame(width: 20)
-                .foregroundColor(.blue)
-
-            Text(label)
-                .foregroundColor(.secondary)
-
-            Spacer()
-
-            Text(display(value))
-                .foregroundColor(value.trimmed.isEmpty || value == "—" ? .secondary : .primary)
+        VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
+            Text(title)
+                .font(Theme.Typography.caption)
+                .foregroundColor(Theme.Colors.secondaryText)
+            Text(value.isEmpty ? "—" : value)
+                .font(Theme.Typography.subheadline)
+                .foregroundColor(Theme.Colors.text)
         }
-        .font(.subheadline)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(label): \(display(value))")
-    }
-
-    private func display(_ v: String) -> String {
-        let t = v.trimmed
-        return t.isEmpty ? "—" : t
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(Theme.Spacing.sm)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                .fill(Color(.systemGray6))
+        )
     }
 }
 
 private struct RecentActivitySection: View {
     let sparkValues: [Double]
     let images: [UIImage]
-    var onViewAll: () -> Void
     var onAdd: () -> Void
 
     var body: some View {
-        VStack(spacing: 12) {
-            HStack {
-                Text("Recent Activity")
-                    .font(.headline)
-                Spacer()
-                Button(action: onViewAll) {
-                    Text("View All")
-                        .font(.subheadline.bold())
-                }
-            }
-
-            VStack(spacing: 6) {
+        Card {
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                 HStack {
-                    Text("Sessions last 7 days")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    Text("Recent Activity")
+                        .font(Theme.Typography.headline)
+                        .foregroundColor(Theme.Colors.text)
                     Spacer()
+                    NavigationLink("View All", value: Destination.activities)
+                        .font(Theme.Typography.subheadline)
+                        .foregroundColor(Theme.Colors.primary)
                 }
-                SparklineView(values: sparkValues)
-                    .frame(height: 56)
-            }
-            .padding()
-            .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.separator)))
 
-            // Media carousel with leading + tile
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    AddTile(action: onAdd)
-                    ForEach(Array(images.enumerated()), id: \.0) { _, img in
-                        Image(uiImage: img)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 96, height: 96)
-                            .clipped()
-                            .cornerRadius(10)
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(.separator)))
+                SparklineView(values: sparkValues)
+                    .frame(height: 44)
+                    .padding(.vertical, Theme.Spacing.xxs)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: Theme.Spacing.sm) {
+                        AddTile(action: onAdd)
+                        ForEach(Array(images.prefix(12).enumerated()), id: \.offset) { _, img in
+                            Image(uiImage: img)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 96, height: 96)
+                                .clipped()
+                                .cornerRadius(Theme.CornerRadius.sm)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                        .stroke(Theme.Colors.divider, lineWidth: 0.5)
+                                )
+                        }
                     }
+                    .padding(.trailing, Theme.Spacing.xxs)
                 }
-                .padding(.vertical, 4)
             }
         }
     }
@@ -540,160 +496,174 @@ private struct RecentActivitySection: View {
 
 private struct AddTile: View {
     var action: () -> Void
-
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 6) {
-                Image(systemName: "plus")
-                    .font(.title2)
+            VStack(spacing: Theme.Spacing.xs) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: Theme.IconSize.xl))
+                    .foregroundColor(Theme.Colors.primary)
                 Text("Add")
-                    .font(.caption)
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.text)
             }
             .frame(width: 96, height: 96)
-            .foregroundColor(.blue)
-            .background(RoundedRectangle(cornerRadius: 10).fill(Color(.systemGray6)))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(.separator)))
+            .background(
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                    .fill(Color(.systemGray6))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                    .stroke(Theme.Colors.divider, lineWidth: 0.5)
+            )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Add new session")
     }
 }
 
-private struct QuickActions: View {
-    var onActivities: () -> Void
-    var onGoals: () -> Void
-    var onShare: () -> Void
+private struct SparklineView: View {
+    let values: [Double]
 
     var body: some View {
-        HStack(spacing: 12) {
-            ActionTile(systemName: "list.bullet.rectangle", title: "Activities", action: onActivities)
-            ActionTile(systemName: "flag", title: "Goals", action: onGoals)
-            ActionTile(systemName: "square.and.arrow.up", title: "Share", action: onShare)
+        GeometryReader { geo in
+            let width = geo.size.width
+            let height = geo.size.height
+            let maxVal = max(values.max() ?? 1, 1)
+            let stepX = values.count > 1 ? width / CGFloat(values.count - 1) : 0
+
+            Path { path in
+                for (i, v) in values.enumerated() {
+                    let x = CGFloat(i) * stepX
+                    let y = height - CGFloat(v / maxVal) * height
+                    if i == 0 {
+                        path.move(to: CGPoint(x: x, y: y))
+                    } else {
+                        path.addLine(to: CGPoint(x: x, y: y))
+                    }
+                }
+            }
+            .stroke(
+                LinearGradient(
+                    colors: [Theme.Colors.primary, Theme.Colors.primary.opacity(0.6)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ),
+                lineWidth: 2
+            )
         }
     }
 }
 
 private struct ActionTile: View {
-    let systemName: String
     let title: String
+    let system: String
     var action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 8) {
-                Image(systemName: systemName)
-                    .font(.system(size: 18, weight: .semibold))
-                    .frame(width: 36, height: 36)
-                    .foregroundColor(.blue)
-                    .background(
-                        Circle()
-                            .fill(Color.blue.opacity(0.12))
-                    )
-                Text(title)
-                    .font(.caption)
-                    .foregroundColor(.primary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.separator)))
-            .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 4)
+            ActionTileContent(title: title, system: system)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(title)
+    }
+}
+
+private struct ActionTileContent: View {
+    let title: String
+    let system: String
+    
+    var body: some View {
+        VStack(spacing: Theme.Spacing.xs) {
+            Image(systemName: system)
+                .font(.system(size: Theme.IconSize.lg, weight: .medium))
+                .foregroundColor(Theme.Colors.primary)
+                .frame(width: 44, height: 44)
+                .background(
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.blue.opacity(0.15),
+                                    Color.blue.opacity(0.06)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                )
+            Text(title)
+                .font(Theme.Typography.caption)
+                .foregroundColor(Theme.Colors.text)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Theme.Spacing.sm)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                .fill(Theme.Colors.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                .stroke(Theme.Colors.divider, lineWidth: 0.5)
+        )
     }
 }
 
 private struct ToastView: View {
     let text: String
+
     var body: some View {
-        HStack {
+        HStack(spacing: Theme.Spacing.sm) {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundColor(.white)
             Text(text)
                 .foregroundColor(.white)
-                .font(.subheadline)
+                .font(Theme.Typography.subheadline)
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.black.opacity(0.8)))
-        .padding(.horizontal)
+        .padding(.horizontal, Theme.Spacing.md)
+        .padding(.vertical, Theme.Spacing.sm)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.md, style: .continuous)
+                .fill(Color.black.opacity(0.85))
+        )
+        .padding(.horizontal, Theme.Spacing.md)
+        .shadow(
+            color: Theme.Shadow.md.color,
+            radius: Theme.Shadow.md.radius,
+            x: Theme.Shadow.md.x,
+            y: Theme.Shadow.md.y
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(text)
     }
 }
 
-// A tiny sparkline view (unchanged)
-struct SparklineView: View {
-    var values: [Double]
-
+private struct Card<Content: View>: View {
+    @ViewBuilder var content: Content
     var body: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let h = geo.size.height
-            let maxV = (values.max() ?? 1)
-            let points: [CGPoint] = values.enumerated().map { i, v in
-                let x = w * CGFloat(i) / CGFloat(max(1, values.count - 1))
-                let y = h - (h * CGFloat(v) / CGFloat(maxV == 0 ? 1 : maxV))
-                return CGPoint(x: x, y: y)
-            }
-            Path { p in
-                guard points.count > 0 else { return }
-                p.move(to: points[0])
-                for pt in points.dropFirst() { p.addLine(to: pt) }
-            }
-            .stroke(Color.blue, lineWidth: 2)
-        }
-    }
-}
-
-// Simple outline button style (kept for backward compatibility if referenced elsewhere)
-struct OutlineButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .padding()
-            .background(Color(red: 0.78, green: 0.93, blue: 0.99))
-            .cornerRadius(8)
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black.opacity(0.7), lineWidth: 1))
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .animation(.easeInOut(duration: 0.12), value: configuration.isPressed)
+        content
+            .padding(Theme.Spacing.md)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                    .fill(Theme.Colors.cardBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                    .stroke(Theme.Colors.divider, lineWidth: 0.5)
+            )
+            .shadow(
+                color: Theme.Shadow.sm.color,
+                radius: Theme.Shadow.sm.radius,
+                x: Theme.Shadow.sm.x,
+                y: Theme.Shadow.sm.y
+            )
     }
 }
 
 struct ProfileView_Previews: PreviewProvider {
     static var previews: some View {
-        ProfileView()
-            .environmentObject(AppRouter())
-            .environmentObject(SessionStore())
-    }
-}
-
-private extension String {
-    var trimmed: String { trimmingCharacters(in: .whitespacesAndNewlines) }
-}
-
-// MARK: - Missing Chip view
-
-private struct Chip: View {
-    let text: String
-    let systemName: String
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: systemName)
-                .font(.caption)
-            Text(text.trimmingCharacters(in: .whitespacesAndNewlines))
-                .font(.caption).bold()
+        NavigationView {
+            ProfileView()
+                .environmentObject(AppRouter())
+                .environmentObject(SessionStore())
         }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 10)
-        .foregroundColor(.white)
-        .background(
-            Capsule()
-                .fill(Color.white.opacity(0.18))
-        )
-        .overlay(
-            Capsule()
-                .stroke(Color.white.opacity(0.35), lineWidth: 1)
-        )
-        .accessibilityLabel(text)
     }
 }

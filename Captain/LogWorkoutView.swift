@@ -236,6 +236,9 @@ struct LogWorkoutView: View {
     }
 
     private func saveSession() {
+        // Dismiss keyboard
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty else { return }
 
@@ -268,21 +271,24 @@ struct LogWorkoutView: View {
         ]
         for s in customStats { details[s.name] = s.value }
 
-        DispatchQueue.main.async {
-            NotificationCenter.default.post(
-                name: Notification.Name("SetPreview"),
-                object: nil,
-                userInfo: [
-                    "title": trimmedTitle,
-                    "date": date,
-                    "location": "",
-                    "type": "Workout",
-                    "details": details,
-                    "images": selectedImages,
-                    "origin": "workout",
-                    "isPublic": isPublic
-                ]
-            )
+        NotificationCenter.default.post(
+            name: Notification.Name("SetPreview"),
+            object: nil,
+            userInfo: [
+                "title": trimmedTitle,
+                "date": date,
+                "location": "",
+                "type": "Workout",
+                "details": details,
+                "images": selectedImages,
+                "origin": "workout",
+                "isPublic": isPublic
+            ]
+        )
+
+        NotificationCenter.default.post(name: Notification.Name("NavigateToPreview"), object: nil)
+
+        Task { @MainActor in
             router.navigate(.preview)
         }
     }

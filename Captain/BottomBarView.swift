@@ -14,7 +14,7 @@ struct BottomBarView: View {
         .init(title: "Home", systemImage: "house", destination: .home),
         .init(title: "Profile", systemImage: "person.crop.circle", destination: .profile),
         .init(title: "Log", systemImage: "plus.square.on.square", destination: .logSession),
-        .init(title: "Stats", systemImage: "chart.bar", destination: .settings),
+        .init(title: "Stats", systemImage: "chart.bar", destination: .statistics),
         .init(title: "Settings", systemImage: "gearshape", destination: .settings)
     ]
 
@@ -22,13 +22,11 @@ struct BottomBarView: View {
         HStack(spacing: 18) {
             ForEach(items) { item in
                 Button(action: {
-                    // use main queue and reset the navigation stack so we don't push duplicates
-                    DispatchQueue.main.async {
-                        // pop to root first to avoid deep stacking
-                        router.popToRoot()
-                        // then navigate to the selected destination
-                        router.navigate(item.destination)
-                    }
+                    // Update current immediately for visual feedback
+                    router.current = item.destination
+                    // Reset stack then navigate
+                    router.popToRoot()
+                    router.navigate(item.destination)
                 }) {
                     VStack(spacing: 6) {
                         Image(systemName: item.systemImage)
@@ -68,7 +66,6 @@ struct BottomBarView: View {
         .padding(.horizontal, 12)
     }
 
-    // helper for bottom safe area spacing
     private func safeAreaBottomPadding() -> CGFloat {
         UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
@@ -77,7 +74,6 @@ struct BottomBarView: View {
     }
 }
 
-// Small visual effect blur support for SwiftUI
 struct VisualEffectBlur: UIViewRepresentable {
     var blurStyle: UIBlurEffect.Style
 

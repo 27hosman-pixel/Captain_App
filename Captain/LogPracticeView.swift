@@ -219,6 +219,9 @@ struct LogPracticeView: View {
     }
 
     private func saveSession() {
+        // Dismiss keyboard so the tap isn’t blocked and UI updates proceed
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty else { return }
 
@@ -235,12 +238,16 @@ struct LogPracticeView: View {
             "Notes": notes
         ]
 
-        DispatchQueue.main.async {
-            NotificationCenter.default.post(
-                name: Notification.Name("SetPreview"),
-                object: nil,
-                userInfo: ["title": trimmedTitle, "date": date, "location": location, "type": "Practice", "details": details, "images": selectedImages, "origin": "practice", "isPublic": isPublic]
-            )
+        NotificationCenter.default.post(
+            name: Notification.Name("SetPreview"),
+            object: nil,
+            userInfo: ["title": trimmedTitle, "date": date, "location": location, "type": "Practice", "details": details, "images": selectedImages, "origin": "practice", "isPublic": isPublic]
+        )
+
+        // Belt-and-suspenders: also signal ContentView to navigate
+        NotificationCenter.default.post(name: Notification.Name("NavigateToPreview"), object: nil)
+
+        Task { @MainActor in
             router.navigate(.preview)
         }
     }

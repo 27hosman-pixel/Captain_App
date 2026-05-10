@@ -7,60 +7,71 @@ struct SessionPreviewView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
+            VStack(spacing: Theme.Spacing.md) {
+                // Title
                 Text(previewStore.title)
-                    .font(.largeTitle).bold()
-                    .padding(.top)
+                    .font(Theme.Typography.largeTitle)
+                    .foregroundColor(Theme.Colors.text)
+                    .padding(.top, Theme.Spacing.md)
 
+                // Metadata row
                 HStack {
                     Text(previewStore.sessionType)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .font(Theme.Typography.subheadline)
+                        .foregroundColor(Theme.Colors.secondaryText)
                     Spacer()
                     Text(previewStore.date, style: .date)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .font(Theme.Typography.subheadline)
+                        .foregroundColor(Theme.Colors.secondaryText)
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, Theme.Spacing.md)
 
+                // Image carousel
                 if !previewStore.images.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
+                        HStack(spacing: Theme.Spacing.xs) {
                             ForEach(Array(previewStore.images.enumerated()), id: \.0) { index, img in
                                 Image(uiImage: img)
                                     .resizable()
                                     .scaledToFill()
                                     .frame(width: 180, height: 120)
                                     .clipped()
-                                    .cornerRadius(8)
+                                    .cornerRadius(Theme.CornerRadius.sm)
                             }
                         }
-                        .padding(.horizontal)
+                        .padding(.horizontal, Theme.Spacing.md)
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
+                // Details card
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                     Text("Details")
-                        .font(.headline)
+                        .font(Theme.Typography.headline)
+                        .foregroundColor(Theme.Colors.text)
+                    
                     ForEach(previewStore.details.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
                         HStack {
                             Text(key + ":")
-                                .font(.subheadline).bold()
+                                .font(Theme.Typography.subheadline)
+                                .fontWeight(.bold)
+                                .foregroundColor(Theme.Colors.text)
                             Text(value)
-                                .font(.subheadline)
+                                .font(Theme.Typography.subheadline)
+                                .foregroundColor(Theme.Colors.text)
                             Spacer()
                         }
-                        .padding(.vertical, 4)
+                        .padding(.vertical, Theme.Spacing.xxs)
                     }
                 }
-                .padding()
-                .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
-                .padding(.horizontal)
+                .cardStyle()
+                .padding(.horizontal, Theme.Spacing.md)
 
                 // Visibility toggle
                 HStack {
                     Text("Visibility")
-                        .font(.subheadline).bold()
+                        .font(Theme.Typography.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(Theme.Colors.text)
                     Spacer()
                     Picker("Visibility", selection: $previewStore.isPublic) {
                         Text("Public").tag(true)
@@ -69,47 +80,54 @@ struct SessionPreviewView: View {
                     .pickerStyle(.segmented)
                     .frame(width: 180)
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, Theme.Spacing.md)
 
                 // Actions
-                HStack(spacing: 12) {
+                VStack(spacing: Theme.Spacing.sm) {
+                    // Post button (primary)
                     Button(action: {
-                        // Persist session using SessionStore (respect visibility)
-                        sessionStore.addSession(title: previewStore.title, date: previewStore.date, location: previewStore.location, sessionType: previewStore.sessionType, details: previewStore.details, images: previewStore.images, origin: previewStore.origin, isPublic: previewStore.isPublic)
+                        sessionStore.addSession(
+                            title: previewStore.title,
+                            date: previewStore.date,
+                            location: previewStore.location,
+                            sessionType: previewStore.sessionType,
+                            details: previewStore.details,
+                            images: previewStore.images,
+                            origin: previewStore.origin,
+                            isPublic: previewStore.isPublic
+                        )
                         previewStore.clear()
-                        router.popToRoot()
+                        router.replaceWith(.activities)
+                        NotificationCenter.default.post(
+                            name: Notification.Name("ShowPostedToast"),
+                            object: nil
+                        )
                     }) {
                         Text("Post")
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(RoundedRectangle(cornerRadius: 12).fill(Color.blue))
                     }
+                    .buttonStyle(ThemePrimaryButtonStyle())
 
-                    Button(action: {
-                        // Save draft
-                        previewStore.saveDraft()
-                        previewStore.clear()
-                        router.popToRoot()
-                    }) {
-                        Text("Save Draft")
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(RoundedRectangle(cornerRadius: 12).stroke(Color(.systemGray4)))
-                    }
+                    // Secondary actions
+                    HStack(spacing: Theme.Spacing.sm) {
+                        Button(action: {
+                            previewStore.saveDraft()
+                            previewStore.clear()
+                            router.popToRoot()
+                        }) {
+                            Text("Save Draft")
+                        }
+                        .buttonStyle(ThemeSecondaryButtonStyle())
 
-                    Button(action: {
-                        // Edit: go back to the last screen to adjust
-                        router.popToRoot()
-                    }) {
-                        Text("Edit")
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(RoundedRectangle(cornerRadius: 12).stroke(Color(.systemGray4)))
+                        Button(action: {
+                            router.popToRoot()
+                        }) {
+                            Text("Edit")
+                        }
+                        .buttonStyle(ThemeSecondaryButtonStyle())
                     }
                 }
-                .padding(.horizontal)
-                .padding(.bottom, 24)
+                .padding(.horizontal, Theme.Spacing.md)
+                .padding(.bottom, Theme.Spacing.lg)
             }
         }
         .navigationTitle("Preview")
@@ -124,3 +142,4 @@ struct SessionPreviewView_Previews: PreviewProvider {
             .environmentObject(SessionStore())
     }
 }
+

@@ -21,58 +21,138 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section(header: Text("Account")) {
-                Button("Manage Profile") {
+            Section {
+                Button(action: {
                     router.navigate(.buildProfile)
+                }) {
+                    HStack {
+                        Text("Manage Profile")
+                            .font(Theme.Typography.body)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: Theme.IconSize.sm))
+                            .foregroundColor(Theme.Colors.secondaryText)
+                    }
                 }
-                Button(role: .destructive) {
+                
+                Button(role: .destructive, action: {
                     profileStore.clear()
-                } label: {
+                }) {
                     Text("Clear Profile")
+                        .font(Theme.Typography.body)
                 }
+            } header: {
+                Text("Account")
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.secondaryText)
+                    .textCase(.uppercase)
             }
 
-            Section(header: Text("Notifications")) {
+            Section {
                 Toggle("Remind me to log sessions", isOn: $remindersEnabled)
-                DatePicker("Reminder time", selection: Binding(get: {
-                    Date(timeIntervalSinceReferenceDate: reminderTime)
-                }, set: { newDate in
-                    reminderTime = newDate.timeIntervalSinceReferenceDate
-                }), displayedComponents: .hourAndMinute)
+                    .font(Theme.Typography.body)
+                
+                DatePicker(
+                    "Reminder time",
+                    selection: Binding(
+                        get: { Date(timeIntervalSinceReferenceDate: reminderTime) },
+                        set: { newDate in reminderTime = newDate.timeIntervalSinceReferenceDate }
+                    ),
+                    displayedComponents: .hourAndMinute
+                )
+                .font(Theme.Typography.body)
                 .disabled(!remindersEnabled)
+            } header: {
+                Text("Notifications")
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.secondaryText)
+                    .textCase(.uppercase)
             }
 
-            Section(header: Text("Privacy")) {
+            Section {
                 Toggle("Default new sessions are Public", isOn: $defaultSessionPublic)
+                    .font(Theme.Typography.body)
+                
                 Text("You can still change visibility per session when logging.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.secondaryText)
+            } header: {
+                Text("Privacy")
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.secondaryText)
+                    .textCase(.uppercase)
             }
 
-            Section(header: Text("Data & Storage")) {
-                Button("Export my data") {
+            Section {
+                Button(action: {
                     exportData()
+                }) {
+                    HStack {
+                        Text("Export my data")
+                            .font(Theme.Typography.body)
+                        Spacer()
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: Theme.IconSize.sm))
+                            .foregroundColor(Theme.Colors.primary)
+                    }
                 }
-                Button(role: .destructive) {
+                
+                Button(role: .destructive, action: {
                     sessionStore.clearAll()
-                } label: {
+                }) {
                     Text("Clear all sessions")
+                        .font(Theme.Typography.body)
                 }
-                Button(role: .destructive) {
+                
+                Button(role: .destructive, action: {
                     sessionStore.deleteAllSessionMediaFiles()
-                } label: {
+                }) {
                     Text("Remove stored media files")
+                        .font(Theme.Typography.body)
                 }
+            } header: {
+                Text("Data & Storage")
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.secondaryText)
+                    .textCase(.uppercase)
             }
 
-            Section(header: Text("About")) {
+            Section {
                 HStack {
                     Text("Version")
+                        .font(Theme.Typography.body)
                     Spacer()
-                    Text(appVersionString()).foregroundColor(.secondary)
+                    Text(appVersionString())
+                        .font(Theme.Typography.body)
+                        .foregroundColor(Theme.Colors.secondaryText)
                 }
-                Link("Privacy Policy", destination: URL(string: "https://example.com/privacy")!)
-                Link("Terms of Service", destination: URL(string: "https://example.com/terms")!)
+                
+                Link(destination: URL(string: "https://example.com/privacy")!) {
+                    HStack {
+                        Text("Privacy Policy")
+                            .font(Theme.Typography.body)
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: Theme.IconSize.sm))
+                            .foregroundColor(Theme.Colors.secondaryText)
+                    }
+                }
+                
+                Link(destination: URL(string: "https://example.com/terms")!) {
+                    HStack {
+                        Text("Terms of Service")
+                            .font(Theme.Typography.body)
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: Theme.IconSize.sm))
+                            .foregroundColor(Theme.Colors.secondaryText)
+                    }
+                }
+            } header: {
+                Text("About")
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.secondaryText)
+                    .textCase(.uppercase)
             }
         }
         .navigationTitle("Settings")

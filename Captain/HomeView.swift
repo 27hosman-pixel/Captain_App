@@ -17,7 +17,6 @@ struct Post: Identifiable, Hashable {
 final class FeedStore: ObservableObject {
     @Published var posts: [Post] = []
 
-    // Sample loader for previews and quick testing
     func loadSample() {
         posts = [
             Post(author: "riya_tad", timeAgo: "3:47 pm", title: "Game vs. Hinsdale Central (3-1 W)", imageNames: [], goals: 3, assists: 1, minutesPlayed: 90, likes: 12, comments: 3),
@@ -32,15 +31,17 @@ final class FeedStore: ObservableObject {
 
 struct HomeView: View {
     @StateObject private var store = FeedStore()
+    @EnvironmentObject var sessionStore: SessionStore
+    @EnvironmentObject var feedFilters: FeedFilters
     @EnvironmentObject var router: AppRouter
 
-    // Local navigation to concrete views
     @State private var goToMessages = false
     @State private var goToNotifications = false
+    @State private var showFilterSheet = false
 
     var body: some View {
+        // Remove the overlayed bottom bar here; the global bar in ContentView will handle it.
         ZStack {
-            // Hidden links to push concrete views
             NavigationLink(isActive: $goToMessages) {
                 MessagingView()
             } label: { EmptyView() }
@@ -53,78 +54,99 @@ struct HomeView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
-                    // Hero header with right-side actions
                     HomeHeroHeader(
                         onMessages: { goToMessages = true },
                         onNotifications: { goToNotifications = true }
                     )
 
-                    // Content stack
+                    // apply consistent content inset to avoid leading clipping
                     VStack(spacing: 16) {
-                        if store.posts.isEmpty {
+                        // Check BOTH sample posts and real sessions
+                        if filteredSessions.isEmpty && store.posts.isEmpty {
                             EmptyFeedCard(
-                                onFindFriends: {
-                                    // Placeholder action — implement friend search later
-                                    print("Find Friends tapped")
-                                },
+                                onFindFriends: { print("Find Friends tapped") },
                                 onLogSession: {
                                     Task { @MainActor in
                                         router.navigate(.logSession)
                                     }
                                 }
                             )
-                            .padding(.horizontal)
                         } else {
-                            // Optional "Latest" section header
                             HStack {
                                 Text("Latest")
                                     .font(.headline)
                                 Spacer()
                                 Button {
-                                    // future filter/sort
+                                    showFilterSheet = true
                                 } label: {
-                                    Label("Filters", systemImage: "slider.horizontal.3")
-                                        .font(.subheadline.bold())
+                                    HStack(spacing: 6) {
+                                        Label("Filters", systemImage: "slider.horizontal.3")
+                                            .font(.subheadline.bold())
+                                        
+                                        // Badge indicator for active filters
+                                        if feedFilters.hasActiveFilters {
+                                            ZStack {
+                                                Circle()
+                                                    .fill(Color.blue)
+                                                    .frame(width: 20, height: 20)
+                                                
+                                                Text("\(feedFilters.activeFilterCount)")
+                                                    .font(.system(size: 12, weight: .bold))
+                                                    .foregroundColor(.white)
+                                            }
+                                        }
+                                    }
                                 }
                                 .buttonStyle(.plain)
                             }
-                            .padding(.horizontal)
 
                             VStack(spacing: 12) {
+                                // FIRST: Show real user sessions from SessionStore (filter out empty/invalid ones)
+                                ForEach(filteredSessions) { session in
+                                    Card {
+                                        SessionCardView(session: session, sessionStore: sessionStore)
+                                    }
+                                }
+                                
+                                // THEN: Show sample posts from FeedStore
                                 ForEach(store.posts, id: \.id) { post in
                                     Card {
                                         PostCardView(post: post)
                                     }
                                 }
-                                .padding(.horizontal)
                             }
                         }
 
                         Spacer(minLength: 24)
                     }
+                    .padding(.horizontal, 16) // inset all feed content
                     .padding(.top, 12)
+                    // Add bottom padding to ensure last content is not obscured by the global bottom bar.
+                    .padding(.bottom, 120)
                 }
             }
             .onAppear {
                 store.loadSample()
             }
-
-            // Bottom bar overlay (consistent across app)
-            VStack {
-                Spacer()
-                BottomBarView()
-                    .environmentObject(router)
-                    .padding(.bottom, 0)
-            }
-            .edgesIgnoringSafeArea(.bottom)
         }
-        // Remove toolbar leading menu; not needed anymore
         .navigationTitle("Home")
         .toolbar { }
+        .sheet(isPresented: $showFilterSheet) {
+            FilterSheetView(filters: feedFilters)
+        }
+    }
+    
+    // MARK: - Filtered Sessions
+    
+    /// Apply all active filters to the session list
+    private var filteredSessions: [SessionData] {
+        sessionStore.sessions
+            .filter { !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .filter { feedFilters.matches(session: $0) }
     }
 }
 
-// MARK: - Subviews styled to match Profile/Log
+// MARK: - Restored subviews needed by HomeView
 
 private struct HomeHeroHeader: View {
     var onMessages: () -> Void
@@ -143,7 +165,6 @@ private struct HomeHeroHeader: View {
                     .fill(LinearGradient(colors: [Color.white.opacity(0.08), Color.clear], startPoint: .top, endPoint: .bottom))
             )
 
-            // Title + subtitle + top-right actions
             VStack {
                 HStack {
                     Spacer()
@@ -168,11 +189,11 @@ private struct HomeHeroHeader: View {
                         .foregroundColor(.white.opacity(0.9))
                         .lineLimit(2)
                 }
-                .padding(.leading, 0)   // flush to left edge
+                .padding(.leading, 0)
                 .padding(.bottom, 14)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.horizontal, 16) // keep overall content inset consistent with system margins
+            .padding(.horizontal, 16)
         }
     }
 }
@@ -202,12 +223,328 @@ private struct Card<Content: View>: View {
     @ViewBuilder var content: Content
     var body: some View {
         content
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.vertical, 20)
             .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.separator)))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.separator).opacity(0.5), lineWidth: 0.5))
             .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 4)
     }
 }
+
+// MARK: - Session Card for Real User Sessions (Strava-inspired design)
+
+struct SessionCardView: View {
+    let session: SessionData
+    let sessionStore: SessionStore
+    @State private var isLiked: Bool = false
+    @State private var likeCount: Int = 0
+    @State private var commentCount: Int = 0
+    @State private var showCommentSheet: Bool = false
+    @State private var newComment: String = ""
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // MARK: - Header Section
+            HStack(alignment: .center, spacing: 12) {
+                // Avatar
+                ZStack {
+                    Circle()
+                        .fill(Color.blue.opacity(0.12))
+                    Image(systemName: "person.fill")
+                        .foregroundColor(.blue)
+                        .font(.system(size: 20))
+                }
+                .frame(width: 40, height: 40)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    // Name and timestamp
+                    HStack(spacing: 8) {
+                        Text("You")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.primary)
+                        
+                        if !session.isPublic {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Text(timeAgo(from: session.date))
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    // Metadata line (date • location)
+                    HStack(spacing: 4) {
+                        Text(formatDate(session.date))
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                        
+                        if !session.location.isEmpty {
+                            Text("•")
+                                .foregroundColor(.secondary)
+                            
+                            Image(systemName: "location.fill")
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
+                            
+                            Text(session.location)
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+            }
+            .padding(.bottom, 12)
+            
+            // MARK: - Title
+            Text(session.title)
+                .font(.system(size: 24, weight: .bold))
+                .foregroundColor(.primary)
+                .lineLimit(2)
+                .padding(.bottom, 8)
+            
+            // MARK: - Description/Notes (if available)
+            if let notes = session.details["Notes"], !notes.isEmpty {
+                Text(notes)
+                    .font(.system(size: 15))
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+                    .padding(.bottom, 16)
+            }
+            
+            // MARK: - Stats Grid (Strava-style)
+            statsGrid
+                .padding(.bottom, 16)
+            
+            // MARK: - Media Gallery
+            if !session.imageFileNames.isEmpty {
+                mediaGallery
+                    .padding(.bottom, 12)
+            }
+            
+            // MARK: - Engagement Bar
+            Divider()
+                .padding(.vertical, 8)
+            
+            HStack(spacing: 0) {
+                // Kudos (Likes)
+                HStack(spacing: 4) {
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 12))
+                    Text("\(likeCount) gave kudos")
+                        .font(.system(size: 13))
+                }
+                .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                // Comments
+                Text("\(commentCount) comment\(commentCount == 1 ? "" : "s")")
+                    .font(.system(size: 13))
+                    .foregroundColor(.secondary)
+            }
+            .padding(.bottom, 12)
+            
+            // MARK: - Action Buttons
+            HStack(spacing: 40) {
+                Button(action: {
+                    isLiked.toggle()
+                    likeCount += isLiked ? 1 : -1
+                }) {
+                    VStack(spacing: 4) {
+                        Image(systemName: isLiked ? "hand.thumbsup.fill" : "hand.thumbsup")
+                            .font(.system(size: 24))
+                            .foregroundColor(isLiked ? .orange : .secondary)
+                        Text("Kudos")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+                
+                Button(action: { showCommentSheet = true }) {
+                    VStack(spacing: 4) {
+                        Image(systemName: "bubble.left")
+                            .font(.system(size: 24))
+                            .foregroundColor(.secondary)
+                        Text("Comment")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .sheet(isPresented: $showCommentSheet) {
+            NavigationView {
+                VStack {
+                    List {
+                        TextField("Add a comment...", text: $newComment)
+                    }
+                    HStack {
+                        Button("Cancel") { showCommentSheet = false }
+                        Spacer()
+                        Button("Post") {
+                            commentCount += 1
+                            newComment = ""
+                            showCommentSheet = false
+                        }
+                    }
+                    .padding()
+                }
+                .navigationTitle("Comments")
+            }
+        }
+    }
+    
+    // MARK: - Stats Grid (inspired by Strava's Distance/Pace/Time layout)
+    
+    private var statsGrid: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(topStats.enumerated()), id: \.offset) { index, stat in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(stat.label)
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                        .textCase(.uppercase)
+                    
+                    Text(stat.value)
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.primary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+    
+    // MARK: - Media Gallery
+    
+    private var mediaGallery: some View {
+        let imageCount = session.imageFileNames.count
+        
+        return Group {
+            if imageCount == 1 {
+                // Single large image
+                singleImage(session.imageFileNames[0])
+            } else if imageCount == 2 {
+                // Two images side by side
+                HStack(spacing: 4) {
+                    ForEach(session.imageFileNames.prefix(2), id: \.self) { fileName in
+                        gridImage(fileName)
+                    }
+                }
+            } else if imageCount >= 3 {
+                // Grid layout (first image large, others smaller)
+                HStack(spacing: 4) {
+                    singleImage(session.imageFileNames[0])
+                        .frame(maxWidth: .infinity)
+                    
+                    VStack(spacing: 4) {
+                        ForEach(session.imageFileNames.prefix(3).dropFirst(), id: \.self) { fileName in
+                            gridImage(fileName)
+                                .frame(height: 120)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+    
+    private func singleImage(_ fileName: String) -> some View {
+        Group {
+            if let image = sessionStore.image(for: fileName) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(height: 240)
+                    .clipped()
+            } else {
+                Rectangle()
+                    .fill(Color(.systemGray6))
+                    .frame(height: 240)
+            }
+        }
+    }
+    
+    private func gridImage(_ fileName: String) -> some View {
+        Group {
+            if let image = sessionStore.image(for: fileName) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .clipped()
+            } else {
+                Rectangle()
+                    .fill(Color(.systemGray6))
+            }
+        }
+    }
+    
+    // MARK: - Helpers
+    
+    private var topStats: [(label: String, value: String)] {
+        var stats: [(label: String, value: String)] = []
+        
+        // Map session details to Strava-style labels
+        let statMappings: [(keys: [String], label: String)] = [
+            (["Goals"], "Goals"),
+            (["Assists"], "Assists"),
+            (["Minutes", "minutesPlayed"], "Time"),
+            (["TotalMiles"], "Distance"),
+            (["Avg HR"], "Avg HR"),
+            (["Type"], "Type"),
+            (["Drills"], "Drills")
+        ]
+        
+        for mapping in statMappings {
+            for key in mapping.keys {
+                if let value = session.details[key], !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    stats.append((label: mapping.label, value: value))
+                    break
+                }
+            }
+            
+            if stats.count >= 3 { break } // Max 3 stats like Strava
+        }
+        
+        return stats
+    }
+    
+    private func timeAgo(from date: Date) -> String {
+        let interval = Date().timeIntervalSince(date)
+        let minutes = Int(interval / 60)
+        let hours = Int(interval / 3600)
+        let days = Int(interval / 86400)
+        
+        if minutes < 1 { return "Just now" }
+        if minutes < 60 { return "\(minutes)m ago" }
+        if hours < 1 { return "\(minutes)m ago" }
+        if hours < 24 { return "\(hours)h ago" }
+        if days == 1 { return "Yesterday" }
+        if days < 7 { return "\(days)d ago" }
+        
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: date)
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d, yyyy 'at' h:mm a"
+        return formatter.string(from: date)
+    }
+}
+
+// MARK: - Sample Post Card
 
 struct PostCardView: View {
     let post: Post
@@ -291,7 +628,6 @@ struct PostCardView: View {
                 Spacer()
 
                 Button(action: {
-                    // share placeholder
                     print("Share tapped for \(post.title)")
                 }) {
                     Image(systemName: "square.and.arrow.up")
@@ -390,57 +726,6 @@ private struct StatChip: View {
     }
 }
 
-struct EmptyFeedView: View {
-    var onFindFriends: () -> Void
-    var onLogSession: () -> Void
-
-    var body: some View {
-        VStack(spacing: 18) {
-            Spacer()
-
-            Image(systemName: "person.3.fill")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 88, height: 88)
-                .foregroundColor(.blue)
-                .padding(8)
-                .background(Circle().fill(Color.blue.opacity(0.12)))
-
-            Text("Welcome to Captain")
-                .font(.title2).bold()
-
-            Text("Your feed will show sessions from you and your friends. Find teammates or log your first session to get started.")
-                .font(.body)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-
-            HStack(spacing: 12) {
-                Button(action: onFindFriends) {
-                    Text("Find Friends")
-                        .fontWeight(.semibold)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(RoundedRectangle(cornerRadius: 12).stroke(Color.blue, lineWidth: 1))
-                }
-
-                Button(action: onLogSession) {
-                    Text("Log First Session")
-                        .fontWeight(.semibold)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(RoundedRectangle(cornerRadius: 12).fill(Color.blue))
-                        .foregroundColor(.white)
-                }
-            }
-            .padding(.horizontal)
-
-            Spacer()
-        }
-        .padding()
-    }
-}
-
 // A themed empty card to match other screens
 private struct EmptyFeedCard: View {
     var onFindFriends: () -> Void
@@ -488,21 +773,5 @@ private struct EmptyFeedCard: View {
                 }
             }
         }
-    }
-}
-
-struct HomeView_Previews: PreviewProvider {
-    static var previews: some View {
-        Group {
-            HomeView()
-                .previewDisplayName("With Sample Posts")
-
-            HomeView()
-                .onAppear {
-                    // show empty version by clearing store in a real preview scenario
-                }
-                .previewDisplayName("Empty Feed")
-        }
-        .environmentObject(AppRouter())
     }
 }

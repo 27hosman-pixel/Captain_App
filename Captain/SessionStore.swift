@@ -78,7 +78,14 @@ final class SessionStore: ObservableObject {
             let data = try Data(contentsOf: url)
             let decoded = try JSONDecoder().decode([SessionData].self, from: data)
             DispatchQueue.main.async {
-                self.sessions = decoded
+                // Filter out any sessions with empty titles during load
+                self.sessions = decoded.filter { !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                
+                // If we filtered anything out, save the cleaned data
+                if decoded.count != self.sessions.count {
+                    print("🧹 Cleaned \(decoded.count - self.sessions.count) invalid session(s) with empty titles")
+                    self.save()
+                }
             }
         } catch {
             print("Failed to load sessions:", error)
@@ -115,9 +122,16 @@ final class SessionStore: ObservableObject {
     }
 
     func addSession(title: String, date: Date, location: String, sessionType: String, details: [String: String], images: [UIImage] = [], origin: String? = nil, isPublic: Bool = true) {
+        // Validate that the title is not empty
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty else {
+            print("⚠️ Attempted to save session with empty title - skipping")
+            return
+        }
+        
         let id = UUID()
         let imageFileNames = store(images: images, for: id)
-        let s = SessionData(id: id, title: title, date: date, location: location, sessionType: sessionType, details: details, imageFileNames: imageFileNames, origin: origin, isPublic: isPublic)
+        let s = SessionData(id: id, title: trimmedTitle, date: date, location: location, sessionType: sessionType, details: details, imageFileNames: imageFileNames, origin: origin, isPublic: isPublic)
         sessions.insert(s, at: 0)
         save()
     }
