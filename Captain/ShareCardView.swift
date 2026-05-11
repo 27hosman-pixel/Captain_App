@@ -7,7 +7,8 @@ import Photos
 struct ShareCardView: View {
     let previewStore: PreviewStore
     
-    @State private var selectedFormat: StatCardFormat = .square
+    // Format is now hardcoded to square (works with all sharing platforms)
+    private let selectedFormat: StatCardFormat = .square
     @State private var selectedStyle: StatCardVisualStyle = .midnight
     @State private var renderedImage: UIImage?
     @State private var isRendering: Bool = false
@@ -21,12 +22,9 @@ struct ShareCardView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Format selector
-                    FormatSelectorView(selectedFormat: $selectedFormat)
-                        .padding(.top, 8)
-                    
                     // Live preview
                     previewSection
+                        .padding(.top, 8)
                     
                     // Style selector (collapsible)
                     StyleSelectorView(selectedStyle: $selectedStyle)
@@ -47,9 +45,6 @@ struct ShareCardView: View {
                         dismiss()
                     }
                 }
-            }
-            .task(id: selectedFormat) {
-                await renderCard()
             }
             .task(id: selectedStyle) {
                 await renderCard()
@@ -168,6 +163,13 @@ struct ShareCardView: View {
     private func renderCard() async {
         isRendering = true
         
+        // Debug logging
+        print("🎨 ShareCardView: Starting render...")
+        print("🎨 ShareCardView: PreviewStore has \(previewStore.images.count) images")
+        if !previewStore.images.isEmpty {
+            print("🎨 ShareCardView: First image size: \(previewStore.images[0].size)")
+        }
+        
         // Small delay to show loading state
         try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
@@ -176,6 +178,12 @@ struct ShareCardView: View {
             style: selectedStyle,
             format: selectedFormat
         )
+        
+        if let rendered = renderedImage {
+            print("✅ ShareCardView: Successfully rendered image with size \(rendered.size)")
+        } else {
+            print("❌ ShareCardView: Failed to render image")
+        }
         
         isRendering = false
     }

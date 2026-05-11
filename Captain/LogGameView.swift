@@ -45,10 +45,6 @@ struct LogGameView: View {
     // Photos
     @State private var selectedItems: [PhotosPickerItem] = []
     @State private var selectedImages: [UIImage] = []
-
-    // Visibility default from Settings
-    @AppStorage("default_session_public") private var defaultSessionPublic: Bool = true
-    @State private var isPublic: Bool = true
     
     // Track the last loaded draft ID to prevent double-loading the same draft
     @State private var loadedDraftId: UUID?
@@ -216,16 +212,6 @@ struct LogGameView: View {
 
                 // Footer actions
                 VStack(spacing: 12) {
-                    Toggle(isOn: $isPublic) {
-                        HStack {
-                            Image(systemName: isPublic ? "globe" : "lock.fill")
-                            Text(isPublic ? "Public" : "Private")
-                        }
-                    }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(10)
-
                     Button(action: saveSession) {
                         Text("Save Game")
                             .font(.headline)
@@ -254,25 +240,41 @@ struct LogGameView: View {
         .navigationTitle("Log Game")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            isPublic = defaultSessionPublic
             loadDraftIfNeeded()
+        }
+        .onChange(of: router.path.count) { oldValue, newValue in
+            // When navigating back from preview (path count decreases)
+            if newValue < oldValue {
+                loadDraftIfNeeded()
+            }
         }
     }
     
     private func loadDraftIfNeeded() {
-        // Check if we have draft data AND we haven't loaded THIS specific draft yet
-        guard let draftId = previewStore.currentDraftId,
-              loadedDraftId != draftId,
-              !previewStore.title.isEmpty else {
+        // Check if we have data in PreviewStore
+        guard !previewStore.title.isEmpty else {
             return
         }
         
-        // Load data from PreviewStore (from a resumed draft)
+        // Skip if this is a different session (user started new while preview has old data)
+        // But allow reload if it's the SAME session (coming back from edit)
+        if !title.isEmpty && title != previewStore.title {
+            print("✏️ LogGameView: Skipping load - different session in form")
+            return
+        }
+        
+        print("✏️ LogGameView: Loading data from PreviewStore '\(previewStore.title)'")
+        
+        // Load data from PreviewStore
         title = previewStore.title
         date = previewStore.date
         location = previewStore.location
-        isPublic = previewStore.isPublic
         selectedImages = previewStore.images
+        
+        // Mark as loaded if from draft
+        if let draftId = previewStore.currentDraftId {
+            loadedDraftId = draftId
+        }
         
         // Parse details
         if let opponentStr = previewStore.details["Opponent"] {
@@ -311,7 +313,8 @@ struct LogGameView: View {
             notes = notesStr
         }
         
-        // Load custom stats (any detail that's not in the standard fields)
+        // Load custom stats
+        customStats.removeAll()
         let standardKeys = ["Opponent", "Final Score", "Minutes", "Goals", "Assists", "Tackles", "TotalMiles", "Avg HR", "Notes"]
         for (key, value) in previewStore.details {
             if !standardKeys.contains(key) {
@@ -319,7 +322,7 @@ struct LogGameView: View {
             }
         }
         
-        loadedDraftId = draftId
+        print("✏️ LogGameView: Loaded successfully - \(selectedImages.count) images")
     }
 
     private func saveSession() {
@@ -352,7 +355,7 @@ struct LogGameView: View {
         NotificationCenter.default.post(
             name: Notification.Name("SetPreview"),
             object: nil,
-            userInfo: ["title": trimmedTitle, "date": date, "location": location, "type": "Game", "details": details, "images": selectedImages, "isPublic": isPublic]
+            userInfo: ["title": trimmedTitle, "date": date, "location": location, "type": "Game", "details": details, "images": selectedImages]
         )
 
         NotificationCenter.default.post(name: Notification.Name("NavigateToPreview"), object: nil)

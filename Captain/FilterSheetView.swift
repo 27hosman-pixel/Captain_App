@@ -48,24 +48,6 @@ struct FilterSheetView: View {
                         }
                     }
                     
-                    Divider()
-                        .padding(.vertical, Theme.Spacing.lg)
-                    
-                    // Source Section
-                    FilterSection(title: "Show") {
-                        VStack(spacing: 12) {
-                            ForEach(SourceFilter.allCases, id: \.self) { source in
-                                FilterOptionRow(
-                                    icon: source.icon,
-                                    title: source.displayName,
-                                    isSelected: filters.source == source
-                                ) {
-                                    filters.setSource(source)
-                                }
-                            }
-                        }
-                    }
-                    
                     Spacer(minLength: 32)
                 }
                 .padding(.horizontal, Theme.Spacing.md)

@@ -1,8 +1,11 @@
+
 //
 //  ContentView.swift
 //  Captain
 //
 //  Created by Hana Osman on 3/4/26.
+//
+//  Simplified - No authentication required, just profile creation
 //
 
 import SwiftUI
@@ -12,13 +15,21 @@ struct ContentView: View {
     @StateObject private var previewStore = PreviewStore()
     @StateObject private var sessionStore = SessionStore()
     @StateObject private var feedFilters = FeedFilters()
-    @EnvironmentObject var authStore: AuthStore
+    @StateObject private var profileStore = ProfileStore()
+    
+    // Read theme preference
+    @AppStorage("app_theme") private var appThemeRaw: String = AppTheme.system.rawValue
+    
+    private var appTheme: AppTheme {
+        AppTheme(rawValue: appThemeRaw) ?? .system
+    }
 
     // Tab selection
     private enum Tab: Hashable {
         case home, profile, log, stats, settings
     }
     @State private var selectedTab: Tab = .home
+    @State private var showingBuildProfile = false
 
     // Per-tab navigation paths
     @State private var homePath = NavigationPath()
@@ -28,191 +39,188 @@ struct ContentView: View {
     @State private var settingsPath = NavigationPath()
 
     var body: some View {
-        ZStack {
-            if !authStore.isAuthenticated {
+        Group {
+            if !profileStore.hasProfile {
+                // Show landing page if no profile exists
                 landingView
-            } else if authStore.isAuthenticated && !authStore.hasCompletedProfile {
-                NavigationStack {
-                    BuildProfileView()
-                }
-                .environmentObject(authStore)
+                    .preferredColorScheme(.light)
             } else {
-                TabView(selection: $selectedTab) {
-                    // Home tab
-                    NavigationStack(path: $homePath) {
-                        HomeView()
-                            .environmentObject(sessionStore)
-                            .navigationDestination(for: Destination.self) { dest in
-                                destinationView(for: dest)
-                            }
-                    }
-                    .tabItem {
-                        Label("Home", systemImage: "house")
-                    }
-                    .tag(Tab.home)
-
-                    // Profile tab
-                    NavigationStack(path: $profilePath) {
-                        ProfileView()
-                            .environmentObject(sessionStore)
-                            .environmentObject(feedFilters)
-                            .navigationDestination(for: Destination.self) { dest in
-                                destinationView(for: dest)
-                            }
-                    }
-                    .tabItem {
-                        Label("Profile", systemImage: "person.crop.circle")
-                    }
-                    .tag(Tab.profile)
-
-                    // Log tab (hub -> practice/game/workout/preview)
-                    NavigationStack(path: $logPath) {
-                        LogSessionChoiceView()
-                            .navigationDestination(for: Destination.self) { dest in
-                                destinationView(for: dest)
-                            }
-                    }
-                    .tabItem {
-                        Label("Log", systemImage: "plus.square.on.square")
-                    }
-                    .tag(Tab.log)
-
-                    // Stats tab
-                    NavigationStack(path: $statsPath) {
-                        StatisticsView()
-                            .environmentObject(sessionStore)
-                            .navigationDestination(for: Destination.self) { dest in
-                                destinationView(for: dest)
-                            }
-                    }
-                    .tabItem {
-                        Label("Stats", systemImage: "chart.bar")
-                    }
-                    .tag(Tab.stats)
-
-                    // Settings tab
-                    NavigationStack(path: $settingsPath) {
-                        SettingsView()
-                            .navigationDestination(for: Destination.self) { dest in
-                                destinationView(for: dest)
-                            }
-                    }
-                    .tabItem {
-                        Label("Settings", systemImage: "gearshape")
-                    }
-                    .tag(Tab.settings)
-                }
-                .onAppear { routeForAuthState() }
-                .onChange(of: authStore.isAuthenticated) { _, _ in routeForAuthState() }
-                .onChange(of: authStore.hasCompletedProfile) { _, _ in routeForAuthState() }
-                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToBuildProfile"))) { _ in
-                    selectedTab = .profile
-                    clearAllPaths()
-                    authToBuildProfile()
-                }
-                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToProfile"))) { _ in
-                    selectedTab = .profile
-                    clearAllPaths()
-                }
-                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("OpenMessaging"))) { _ in
-                    selectedTab = .home
-                    homePath.append(Destination.messaging)
-                }
-                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("OpenNotifications"))) { _ in
-                    selectedTab = .home
-                    homePath.append(Destination.notifications)
-                }
-                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToLogPractice"))) { _ in
-                    selectedTab = .log
-                    logPath.append(Destination.logPractice)
-                }
-                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToLogGame"))) { _ in
-                    selectedTab = .log
-                    logPath.append(Destination.logGame)
-                }
-                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToLogWorkout"))) { _ in
-                    selectedTab = .log
-                    logPath.append(Destination.logWorkout)
-                }
-                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToPreview"))) { _ in
-                    selectedTab = .log
-                    logPath.append(Destination.preview)
-                }
-                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToHome"))) { _ in
-                    selectedTab = .home
-                    clearAllPaths()
-                }
+                // Show main app
+                mainAppView
+                    .preferredColorScheme(appTheme.colorScheme)
             }
         }
         .environmentObject(router)
         .environmentObject(previewStore)
         .environmentObject(sessionStore)
         .environmentObject(feedFilters)
-        .environmentObject(authStore)
+        .environmentObject(profileStore)
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ProfileCompleted"))) { _ in
+            // Profile was saved, refresh to check hasProfile
+            profileStore.load()
+        }
     }
 
-    // MARK: - Landing
+    // MARK: - Main App View
+    
+    private var mainAppView: some View {
+        TabView(selection: $selectedTab) {
+            // Home tab
+            NavigationStack(path: $homePath) {
+                HomeView()
+                    .navigationDestination(for: Destination.self) { dest in
+                        destinationView(for: dest)
+                    }
+            }
+            .tabItem {
+                Label("Home", systemImage: "house")
+            }
+            .tag(Tab.home)
+
+            // Profile tab
+            NavigationStack(path: $profilePath) {
+                ProfileView()
+                    .navigationDestination(for: Destination.self) { dest in
+                        destinationView(for: dest)
+                    }
+            }
+            .tabItem {
+                Label("Profile", systemImage: "person.crop.circle")
+            }
+            .tag(Tab.profile)
+
+            // Log tab
+            NavigationStack(path: $logPath) {
+                LogSessionChoiceView()
+                    .navigationDestination(for: Destination.self) { dest in
+                        destinationView(for: dest)
+                    }
+            }
+            .tabItem {
+                Label("Log", systemImage: "plus.square.on.square")
+            }
+            .tag(Tab.log)
+
+            // Stats tab
+            NavigationStack(path: $statsPath) {
+                StatisticsView()
+                    .navigationDestination(for: Destination.self) { dest in
+                        destinationView(for: dest)
+                    }
+            }
+            .tabItem {
+                Label("Stats", systemImage: "chart.bar")
+            }
+            .tag(Tab.stats)
+
+            // Settings tab
+            NavigationStack(path: $settingsPath) {
+                SettingsView()
+                    .navigationDestination(for: Destination.self) { dest in
+                        destinationView(for: dest)
+                    }
+            }
+            .tabItem {
+                Label("Settings", systemImage: "gearshape")
+            }
+            .tag(Tab.settings)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("OpenMessaging"))) { _ in
+            selectedTab = .home
+            homePath.append(Destination.messaging)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("OpenNotifications"))) { _ in
+            selectedTab = .home
+            homePath.append(Destination.notifications)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToLogPractice"))) { _ in
+            selectedTab = .log
+            logPath.append(Destination.logPractice)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToLogGame"))) { _ in
+            selectedTab = .log
+            logPath.append(Destination.logGame)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToLogWorkout"))) { _ in
+            selectedTab = .log
+            logPath.append(Destination.logWorkout)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToPreview"))) { _ in
+            selectedTab = .log
+            logPath.append(Destination.preview)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToHome"))) { _ in
+            selectedTab = .home
+            clearAllPaths()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToDrafts"))) { _ in
+            selectedTab = .profile
+            profilePath.append(Destination.drafts)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SwitchToLogTab"))) { _ in
+            selectedTab = .log
+        }
+    }
+
+    // MARK: - Landing View
 
     private var landingView: some View {
-        VStack(spacing: 0) {
+        NavigationStack {
             ZStack {
                 Color.white.ignoresSafeArea()
-                VStack {
-                    VStack {
+                VStack(spacing: 0) {
+                    Spacer()
+                    
+                    // Logo and branding
+                    VStack(spacing: 8) {
                         Text("CAPTAIN")
                             .font(.system(size: 56, weight: .bold, design: .monospaced))
                             .foregroundColor(.black)
-                            .padding(.top, 48)
-                            .frame(maxWidth: .infinity, alignment: .center)
-
-                        Spacer(minLength: 8)
 
                         Image("CaptainLogo")
                             .resizable()
                             .scaledToFit()
-                            .frame(width: 350, height: 350)
-                            .padding(.bottom, 64)
-
-                        Spacer().frame(height: 12)
-
-                        VStack(spacing: 18) {
-                            NavigationStack {
-                                VStack(spacing: 18) {
-                                    Button(action: {
-                                        // Present login inline
-                                        router.current = .login
-                                    }) {
-                                        Text("LOG IN")
-                                            .font(.headline)
-                                            .frame(maxWidth: .infinity)
-                                    }
-                                    .buttonStyle(PillButtonStyle(colors: [Color(red: 0.78, green: 0.94, blue: 0.99), Color(red: 0.68, green: 0.91, blue: 0.98)], foreground: .black))
-
-                                    Button(action: {
-                                        router.current = .signup
-                                    }) {
-                                        Text("SIGN UP")
-                                            .font(.headline)
-                                            .frame(maxWidth: .infinity)
-                                    }
-                                    .buttonStyle(PillButtonStyle(colors: [Color(red: 0.84, green: 0.87, blue: 0.98), Color(red: 0.72, green: 0.79, blue: 0.96)], foreground: .black))
-                                }
-                                .padding(.horizontal, 36)
-                                .padding(.bottom, 67)
-                                .navigationDestination(isPresented: Binding(get: { router.current == .login }, set: { shown in
-                                    if !shown { router.current = nil }
-                                })) {
-                                    LoginView()
-                                }
-                                .navigationDestination(isPresented: Binding(get: { router.current == .signup }, set: { shown in
-                                    if !shown { router.current = nil }
-                                })) {
-                                    SignUpView()
-                                }
-                            }
-                        }
+                            .frame(width: 300, height: 300)
                     }
+                    
+                    Spacer()
+                    
+                    // Call to action
+                    VStack(spacing: 12) {
+                        Text("Track Your Soccer Journey")
+                            .font(.title3)
+                            .fontWeight(.medium)
+                            .foregroundColor(.black.opacity(0.8))
+                        
+                        Text("Log sessions, track progress, reach your goals")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+                    }
+                    .padding(.bottom, 32)
+                    
+                    // Get Started button
+                    Button(action: {
+                        showingBuildProfile = true
+                    }) {
+                        Text("GET STARTED")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(PillButtonStyle(
+                        colors: [
+                            Color(red: 0.78, green: 0.94, blue: 0.99),
+                            Color(red: 0.68, green: 0.91, blue: 0.98)
+                        ],
+                        foreground: .black
+                    ))
+                    .padding(.horizontal, 36)
+                    .padding(.bottom, 60)
                 }
+            }
+            .navigationDestination(isPresented: $showingBuildProfile) {
+                BuildProfileView()
             }
         }
     }
@@ -224,14 +232,10 @@ struct ContentView: View {
             switch dest {
             case .home:
                 HomeView()
-            case .login:
-                LoginView()
-            case .signup:
-                SignUpView()
             case .buildProfile:
                 BuildProfileView()
             case .profile:
-                ProfileView().environmentObject(sessionStore)
+                ProfileView()
             case .logSession:
                 LogSessionChoiceView()
             case .logPractice:
@@ -254,10 +258,12 @@ struct ContentView: View {
                 MessagingView()
             case .notifications:
                 NotificationsView()
+            case .login, .signup:
+                // These destinations no longer exist, show home instead
+                HomeView()
             }
         }
         .onAppear {
-            // maintain router.current for any code relying on it
             router.current = dest
         }
     }
@@ -268,25 +274,6 @@ struct ContentView: View {
         logPath = NavigationPath()
         statsPath = NavigationPath()
         settingsPath = NavigationPath()
-    }
-
-    private func authToBuildProfile() {
-        // When invoked, we’re authenticated but profile incomplete.
-        // Show BuildProfile by selecting any tab and pushing it, or by replacing with a dedicated stack.
-        selectedTab = .profile
-        profilePath.append(Destination.buildProfile)
-    }
-
-    private func routeForAuthState() {
-        if authStore.isAuthenticated {
-            if authStore.hasCompletedProfile {
-                selectedTab = .profile
-            } else {
-                authToBuildProfile()
-            }
-        } else {
-            // no-op; landingView is shown
-        }
     }
 }
 
@@ -318,5 +305,4 @@ struct PillButtonStyle: ButtonStyle {
 
 #Preview {
     ContentView()
-        .environmentObject(AuthStore())
 }

@@ -1,5 +1,7 @@
 import SwiftUI
 
+import SwiftUI
+
 /// Clean, professional stat card with data-focused design
 /// Optimized for formal sharing and coaching reviews
 struct ProStatsCardView: View {
@@ -9,13 +11,55 @@ struct ProStatsCardView: View {
     let location: String
     let stats: [(label: String, value: String)]
     let format: StatCardFormat
+    let heroImage: UIImage?
     
     var body: some View {
         ZStack {
-            // Clean white background
-            Color.white
+            if let heroImage = heroImage {
+                // Hero photo background with clean white overlay
+                heroPhotoBackground(image: heroImage)
+            } else {
+                // Original clean white background (no photo)
+                Color.white
+            }
             
-            // Content
+            // Content layer
+            contentLayer
+        }
+        .frame(width: format.size.width, height: format.size.height)
+    }
+    
+    // MARK: - Background Layers
+    
+    /// Hero photo with professional clean overlay
+    @ViewBuilder
+    private func heroPhotoBackground(image: UIImage) -> some View {
+        ZStack {
+            // Photo background
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: format.size.width, height: format.size.height)
+                .clipped()
+                .opacity(0.25) // Very subtle - keep it professional
+            
+            // White overlay with gradient for readability
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.85),
+                    Color.white.opacity(0.92),
+                    Color.white.opacity(0.95)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+    }
+    
+    // MARK: - Content Layer
+    
+    @ViewBuilder
+    private var contentLayer: some View {
             VStack(spacing: format == .story ? 40 : 28) {
                 // Header
                 VStack(spacing: 16) {
@@ -96,8 +140,6 @@ struct ProStatsCardView: View {
                 }
                 .padding(.bottom, format == .story ? 60 : 40)
             }
-        }
-        .frame(width: format.size.width, height: format.size.height)
     }
     
     // MARK: - Stats Grid
@@ -253,7 +295,8 @@ struct ProStatsCardView: View {
             ("Sprints", "23"),
             ("Fouls", "1")
         ],
-        format: .square
+        format: .square,
+        heroImage: nil
     )
 }
 
@@ -271,6 +314,7 @@ struct ProStatsCardView: View {
             ("Distance", "4.5 km"),
             ("Heart Rate", "145 bpm")
         ],
-        format: .story
+        format: .story,
+        heroImage: nil
     )
 }

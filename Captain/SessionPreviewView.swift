@@ -7,6 +7,7 @@ struct SessionPreviewView: View {
     @EnvironmentObject var previewStore: PreviewStore
     @EnvironmentObject var sessionStore: SessionStore
     @EnvironmentObject var router: AppRouter
+    @Environment(\.dismiss) private var dismiss
     
     @State private var showShareSheet = false
     @State private var isSaving = false
@@ -34,7 +35,6 @@ struct SessionPreviewView: View {
         .navigationTitle("Preview")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showShareSheet) {
-            // Temporary workaround: explicitly pass dismiss to avoid ambiguity
             ShareCardView(previewStore: previewStore)
                 .interactiveDismissDisabled(false)
         }
@@ -80,16 +80,6 @@ struct SessionPreviewView: View {
                             .lineLimit(1)
                     }
                 }
-                
-                // Privacy indicator
-                HStack(spacing: 6) {
-                    Image(systemName: previewStore.isPublic ? "globe" : "lock.fill")
-                        .font(.system(size: 12))
-                    Text(previewStore.isPublic ? "Public" : "Private")
-                        .font(.system(size: 13, weight: .medium))
-                }
-                .foregroundColor(.secondary)
-                .padding(.top, 4)
             }
             
             // Images preview
@@ -155,12 +145,12 @@ struct SessionPreviewView: View {
     @ViewBuilder
     private var actionButtons: some View {
         VStack(spacing: 12) {
-            // PRIMARY CTA: Share (V1 focus)
-            Button(action: { showShareSheet = true }) {
+            // PRIMARY CTA: Save to My Activities
+            Button(action: saveSession) {
                 HStack(spacing: 12) {
-                    Image(systemName: "square.and.arrow.up")
+                    Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 18, weight: .semibold))
-                    Text("Share to Social Media")
+                    Text("Save to My Activities")
                         .font(.system(size: 17, weight: .semibold))
                 }
                 .frame(maxWidth: .infinity)
@@ -168,13 +158,14 @@ struct SessionPreviewView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
+            .disabled(isSaving)
             
-            // Save to activities
-            Button(action: saveSession) {
+            // Secondary: Share to Social Media (saves first, then shares)
+            Button(action: saveAndShare) {
                 HStack(spacing: 12) {
-                    Image(systemName: "checkmark.circle.fill")
+                    Image(systemName: "square.and.arrow.up")
                         .font(.system(size: 18, weight: .semibold))
-                    Text("Save to My Activities")
+                    Text("Share to Social Media")
                         .font(.system(size: 17, weight: .medium))
                 }
                 .frame(maxWidth: .infinity)
@@ -182,19 +173,6 @@ struct SessionPreviewView: View {
             }
             .buttonStyle(.bordered)
             .disabled(isSaving)
-            
-            // V2 FEATURE: Post to feed (hidden in V1)
-            if FeatureFlags.inAppSocial {
-                Button(action: postToFeed) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "globe")
-                        Text("Post to Feed")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                }
-                .buttonStyle(.borderedProminent)
-            }
             
             // Secondary actions
             HStack(spacing: 12) {
@@ -208,7 +186,7 @@ struct SessionPreviewView: View {
                 .buttonStyle(.bordered)
                 
                 // Edit
-                Button(action: { router.pop() }) {
+                Button(action: editSession) {
                     Label("Edit", systemImage: "pencil")
                         .font(.system(size: 15, weight: .medium))
                         .frame(maxWidth: .infinity)
@@ -226,6 +204,76 @@ struct SessionPreviewView: View {
         guard !isSaving else { return }
         isSaving = true
         
+        print("💾 SessionPreviewView: Starting save process...")
+        print("💾 SessionPreviewView: Title: '\(previewStore.title)'")
+        print("💾 SessionPreviewView: Type: '\(previewStore.sessionType)'")
+        print("💾 SessionPreviewView: Images: \(previewStore.images.count)")
+        
+        // Save images to persistent storage and get filenames
+        let imageFileNames = storeImages()
+        print("💾 SessionPreviewView: Saved \(imageFileNames.count) image files")
+        
+        // Create SessionData from PreviewStore
+        let sessionData = SessionData(
+            id: UUID(),
+            title: previewStore.title,
+            date: previewStore.date,
+            location: previewStore.location,
+            sessionType: previewStore.sessionType,
+            details: previewStore.details,
+            imageFileNames: imageFileNames,
+            origin: nil,
+            isPublic: false
+        )
+        
+        print("💾 SessionPreviewView: Posting SaveNewSession notification...")
+        
+        NotificationCenter.default.post(
+            name: Notification.Name("SaveNewSession"),
+            object: nil,
+            userInfo: ["sessionData": sessionData]
+        )
+        
+        print("💾 SessionPreviewView: Notification posted")
+        
+        if let draftId = previewStore.currentDraftId {
+            previewStore.deleteDraftById(draftId)
+        }
+        
+        previewStore.clear()
+        
+        NotificationCenter.default.post(name: Notification.Name("ShowPostedToast"), object: nil)
+        NotificationCenter.default.post(name: Notification.Name("NavigateToHome"), object: nil)
+        
+        print("💾 SessionPreviewView: Save complete, navigating to home")
+        
+        isSaving = false
+    }
+    
+    /// Save current state as a draft, then go to Drafts screen
+    private func saveDraft() {
+        previewStore.saveDraft()
+        
+        // Haptic confirmation
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
+        
+        // Navigate to Drafts
+        NotificationCenter.default.post(name: Notification.Name("NavigateToDrafts"), object: nil)
+    }
+    
+    /// Navigate back to the logging form — mimic the system Back button
+    private func editSession() {
+        dismiss()
+    }
+    
+    /// Save session first, then show share sheet
+    private func saveAndShare() {
+        guard !isSaving else { return }
+        isSaving = true
+        
+        print("💾 SessionPreviewView: Save and share - starting save...")
+        
         // Save images to persistent storage and get filenames
         let imageFileNames = storeImages()
         
@@ -239,50 +287,27 @@ struct SessionPreviewView: View {
             details: previewStore.details,
             imageFileNames: imageFileNames,
             origin: nil,
-            isPublic: previewStore.isPublic
+            isPublic: false
         )
         
-        // Post notification for SessionStore to handle
-        // This approach doesn't require knowing SessionStore's internal API
+        // Save the session
         NotificationCenter.default.post(
             name: Notification.Name("SaveNewSession"),
             object: nil,
             userInfo: ["sessionData": sessionData]
         )
         
-        // If this was from a draft, delete the draft
+        // Delete draft if editing one
         if let draftId = previewStore.currentDraftId {
             previewStore.deleteDraftById(draftId)
         }
         
-        // Clear preview store
-        previewStore.clear()
+        print("💾 SessionPreviewView: Session saved, now showing share sheet")
         
-        // Show success feedback
-        NotificationCenter.default.post(name: Notification.Name("ShowPostedToast"), object: nil)
-        
-        // Navigate to home/activities  
-        NotificationCenter.default.post(name: Notification.Name("NavigateToHome"), object: nil)
+        // Show share sheet
+        showShareSheet = true
         
         isSaving = false
-    }
-    
-    /// Save current state as a draft
-    private func saveDraft() {
-        previewStore.saveDraft()
-        
-        // Show confirmation (you can add a toast here)
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
-        
-        // Navigate back to root
-        router.popToRoot()
-    }
-    
-    /// V2: Post to social feed (currently just saves)
-    private func postToFeed() {
-        saveSession()
-        // V2: Additional logic to mark as "posted" to feed
     }
     
     // MARK: - Helpers
@@ -345,7 +370,6 @@ struct SessionPreviewView: View {
     previewStore.sessionType = "Game"
     previewStore.date = Date()
     previewStore.location = "National Stadium"
-    previewStore.isPublic = true
     previewStore.details = [
         "Goals": "2",
         "Assists": "1",

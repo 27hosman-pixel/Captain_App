@@ -39,10 +39,6 @@ struct LogWorkoutView: View {
     // Photos
     @State private var selectedItems: [PhotosPickerItem] = []
     @State private var selectedImages: [UIImage] = []
-
-    // Visibility default from Settings
-    @AppStorage("default_session_public") private var defaultSessionPublic: Bool = true
-    @State private var isPublic: Bool = true
     
     // Track the last loaded draft ID to prevent double-loading the same draft
     @State private var loadedDraftId: UUID?
@@ -206,16 +202,6 @@ struct LogWorkoutView: View {
 
                 // Footer actions
                 VStack(spacing: 12) {
-                    Toggle(isOn: $isPublic) {
-                        HStack {
-                            Image(systemName: isPublic ? "globe" : "lock.fill")
-                            Text(isPublic ? "Public" : "Private")
-                        }
-                    }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(10)
-
                     Button(action: saveSession) {
                         Text("Save Workout")
                             .font(.headline)
@@ -244,8 +230,6 @@ struct LogWorkoutView: View {
         .navigationTitle("Log Workout")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            // initialize visibility from Settings
-            isPublic = defaultSessionPublic
             loadDraftIfNeeded()
         }
     }
@@ -256,22 +240,27 @@ struct LogWorkoutView: View {
         print("🔍 loadedDraftId: \(String(describing: loadedDraftId))")
         print("🔍 title: '\(previewStore.title)'")
         
-        // Check if we have draft data AND we haven't loaded THIS specific draft yet
-        guard let draftId = previewStore.currentDraftId,
-              loadedDraftId != draftId else {
-            print("🔍 Guard failed - not loading draft")
+        guard !previewStore.title.isEmpty else {
+            print("🔍 LogWorkout: Skipping draft load - no title in PreviewStore")
             return
         }
         
-        print("✅ Loading draft into LogWorkoutView")
+        if let draftId = previewStore.currentDraftId, loadedDraftId == draftId {
+            print("🔍 LogWorkout: Skipping draft load - already loaded this draft")
+            return
+        }
         
-        // Load data from PreviewStore (from a resumed draft)
+        if !title.isEmpty && title != previewStore.title {
+            print("🔍 LogWorkout: Skipping draft load - form has different data")
+            return
+        }
+        
+        print("✅ LogWorkout: Loading data from PreviewStore...")
+        
         title = previewStore.title
         date = previewStore.date
-        isPublic = previewStore.isPublic
         selectedImages = previewStore.images
         
-        // Parse details
         if let typeStr = previewStore.details["Type"] {
             workoutType = typeStr
         }
@@ -300,7 +289,6 @@ struct LogWorkoutView: View {
             notes = notesStr
         }
         
-        // Load custom stats (any detail that's not in the standard fields)
         let standardKeys = ["Type", "Focus", "Duration", "Sprints", "PeakHR", "TotalMiles", "Notes"]
         for (key, value) in previewStore.details {
             if !standardKeys.contains(key) {
@@ -308,11 +296,12 @@ struct LogWorkoutView: View {
             }
         }
         
-        loadedDraftId = draftId
+        if let draftId = previewStore.currentDraftId {
+            loadedDraftId = draftId
+        }
     }
 
     private func saveSession() {
-        // Dismiss keyboard so the tap isn't blocked and UI updates proceed
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
 
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -357,8 +346,7 @@ struct LogWorkoutView: View {
                 "type": "Workout",
                 "details": details,
                 "images": selectedImages,
-                "origin": "workout",
-                "isPublic": isPublic
+                "origin": "workout"
             ]
         )
 

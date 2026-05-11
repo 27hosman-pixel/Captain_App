@@ -18,6 +18,16 @@ struct StatCardRenderer {
         format: StatCardFormat
     ) async -> UIImage? {
         let stats = extractStats(from: previewStore.details)
+        let heroImage = previewStore.images.first // Use first image as hero photo
+        
+        // Debug logging
+        print("📸 StatCardRenderer: Rendering card with \(previewStore.images.count) images available")
+        if let image = heroImage {
+            print("📸 StatCardRenderer: Using hero image with size \(image.size)")
+        } else {
+            print("📸 StatCardRenderer: No hero image available")
+        }
+        
         return await renderCard(
             title: previewStore.title,
             sessionType: previewStore.sessionType,
@@ -25,7 +35,8 @@ struct StatCardRenderer {
             location: previewStore.location,
             stats: stats,
             style: style,
-            format: format
+            format: format,
+            heroImage: heroImage
         )
     }
     
@@ -41,6 +52,10 @@ struct StatCardRenderer {
         format: StatCardFormat
     ) async -> UIImage? {
         let stats = extractStats(from: sessionData.details)
+        
+        // Load first image from disk if available
+        let heroImage = loadSessionImage(fileName: sessionData.imageFileNames.first)
+        
         return await renderCard(
             title: sessionData.title,
             sessionType: sessionData.sessionType,
@@ -48,7 +63,8 @@ struct StatCardRenderer {
             location: sessionData.location,
             stats: stats,
             style: style,
-            format: format
+            format: format,
+            heroImage: heroImage
         )
     }
     
@@ -62,7 +78,8 @@ struct StatCardRenderer {
         location: String,
         stats: [(label: String, value: String)],
         style: StatCardVisualStyle,
-        format: StatCardFormat
+        format: StatCardFormat,
+        heroImage: UIImage?
     ) async -> UIImage? {
         // Create the appropriate card view based on style
         let cardView = createCardView(
@@ -72,14 +89,20 @@ struct StatCardRenderer {
             location: location,
             stats: stats,
             style: style,
-            format: format
+            format: format,
+            heroImage: heroImage
         )
         
         // Use ImageRenderer to convert SwiftUI view to UIImage
         let renderer = ImageRenderer(content: cardView)
         
-        // Set scale for high quality (use device scale for retina displays)
-        renderer.scale = UIScreen.main.scale
+        // Set scale for high quality
+        // Use windowScene scale for iOS 26.0+, fallback to main scale
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+            renderer.scale = windowScene.screen.scale
+        } else {
+            renderer.scale = UIScreen.main.scale
+        }
         
         // Render the image
         // This happens synchronously but we're already on MainActor
@@ -95,7 +118,8 @@ struct StatCardRenderer {
         location: String,
         stats: [(label: String, value: String)],
         style: StatCardVisualStyle,
-        format: StatCardFormat
+        format: StatCardFormat,
+        heroImage: UIImage?
     ) -> some View {
         switch style {
         case .midnight:
@@ -105,7 +129,8 @@ struct StatCardRenderer {
                 date: date,
                 location: location,
                 stats: stats,
-                format: format
+                format: format,
+                heroImage: heroImage
             )
         case .sunrise:
             SunriseCardView(
@@ -114,7 +139,8 @@ struct StatCardRenderer {
                 date: date,
                 location: location,
                 stats: stats,
-                format: format
+                format: format,
+                heroImage: heroImage
             )
         case .proStats:
             ProStatsCardView(
@@ -123,12 +149,24 @@ struct StatCardRenderer {
                 date: date,
                 location: location,
                 stats: stats,
-                format: format
+                format: format,
+                heroImage: heroImage
             )
         }
     }
     
     // MARK: - Data Extraction
+    
+    /// Load image from SessionData filename
+    private static func loadSessionImage(fileName: String?) -> UIImage? {
+        guard let fileName = fileName,
+              let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+        
+        let fileURL = documentsDirectory.appendingPathComponent(fileName)
+        return UIImage(contentsOfFile: fileURL.path)
+    }
     
     /// Extract and format stats from session details dictionary
     /// Prioritizes key stats and formats them nicely

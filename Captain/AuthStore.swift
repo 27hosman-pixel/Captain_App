@@ -2,9 +2,15 @@
 import Foundation
 import SwiftUI
 import Combine
+import AuthenticationServices
 
 struct AuthSession: Codable, Equatable {
     var userId: String
+}
+
+enum AuthError: Error {
+    case invalidCredential
+    case signInFailed
 }
 
 @MainActor
@@ -66,5 +72,41 @@ final class AuthStore: ObservableObject {
 
     func markProfileCompleted() {
         hasCompletedProfile = true
+    }
+    
+    // MARK: - Sign in with Apple
+    
+    func signInWithApple(authorization: ASAuthorization) async throws {
+        guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential else {
+            throw AuthError.invalidCredential
+        }
+        
+        // Use Apple's unique user identifier as our userId
+        let userId = appleIDCredential.user
+        
+        // Store user info if this is first time sign in
+        if let fullName = appleIDCredential.fullName {
+            let firstName = fullName.givenName ?? ""
+            let lastName = fullName.familyName ?? ""
+            
+            // Save to UserDefaults for pre-filling profile
+            if !firstName.isEmpty {
+                UserDefaults.standard.set(firstName, forKey: "apple_first_name")
+            }
+            if !lastName.isEmpty {
+                UserDefaults.standard.set(lastName, forKey: "apple_last_name")
+            }
+        }
+        
+        // Store email if provided
+        if let email = appleIDCredential.email {
+            UserDefaults.standard.set(email, forKey: "apple_email")
+        }
+        
+        // Persist the userId
+        persist(userId: userId)
+        
+        // New Apple sign-in users need to complete profile
+        hasCompletedProfile = false
     }
 }

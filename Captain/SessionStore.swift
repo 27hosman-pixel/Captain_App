@@ -12,7 +12,7 @@ struct SessionData: Identifiable, Codable, Hashable {
     var origin: String?
     var isPublic: Bool
 
-    init(id: UUID = UUID(), title: String, date: Date, location: String, sessionType: String, details: [String: String], imageFileNames: [String] = [], origin: String? = nil, isPublic: Bool = true) {
+    init(id: UUID = UUID(), title: String, date: Date, location: String, sessionType: String, details: [String: String], imageFileNames: [String] = [], origin: String? = nil, isPublic: Bool = false) {
         self.id = id
         self.title = title
         self.date = date
@@ -38,7 +38,7 @@ struct SessionData: Identifiable, Codable, Hashable {
         details = try c.decode([String: String].self, forKey: .details)
         imageFileNames = try c.decode([String].self, forKey: .imageFileNames)
         origin = try c.decodeIfPresent(String.self, forKey: .origin)
-        isPublic = try c.decodeIfPresent(Bool.self, forKey: .isPublic) ?? true
+        isPublic = try c.decodeIfPresent(Bool.self, forKey: .isPublic) ?? false
     }
 
     func encode(to encoder: Encoder) throws {
@@ -62,6 +62,39 @@ final class SessionStore: ObservableObject {
 
     init() {
         load()
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleSaveNewSession(_:)),
+            name: Notification.Name("SaveNewSession"),
+            object: nil
+        )
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    @objc private func handleSaveNewSession(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let sessionData = userInfo["sessionData"] as? SessionData else {
+            print("❌ SessionStore: Failed to extract sessionData from notification")
+            return
+        }
+        
+        print("💾 SessionStore: Received SaveNewSession notification")
+        print("💾 SessionStore: Saving session '\(sessionData.title)'")
+        
+        let trimmedTitle = sessionData.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty else {
+            print("⚠️ SessionStore: Attempted to save session with empty title - skipping")
+            return
+        }
+        
+        sessions.insert(sessionData, at: 0)
+        save()
+        
+        print("✅ SessionStore: Successfully saved session. Total sessions: \(sessions.count)")
     }
 
     private func documentsDirectory() -> URL? {
@@ -78,10 +111,8 @@ final class SessionStore: ObservableObject {
             let data = try Data(contentsOf: url)
             let decoded = try JSONDecoder().decode([SessionData].self, from: data)
             DispatchQueue.main.async {
-                // Filter out any sessions with empty titles during load
                 self.sessions = decoded.filter { !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
                 
-                // If we filtered anything out, save the cleaned data
                 if decoded.count != self.sessions.count {
                     print("🧹 Cleaned \(decoded.count - self.sessions.count) invalid session(s) with empty titles")
                     self.save()
@@ -102,7 +133,6 @@ final class SessionStore: ObservableObject {
         }
     }
 
-    // Save images to documents and return filenames
     private func store(images: [UIImage], for id: UUID) -> [String] {
         guard let docs = documentsDirectory() else { return [] }
         var names: [String] = []
@@ -121,8 +151,7 @@ final class SessionStore: ObservableObject {
         return names
     }
 
-    func addSession(title: String, date: Date, location: String, sessionType: String, details: [String: String], images: [UIImage] = [], origin: String? = nil, isPublic: Bool = true) {
-        // Validate that the title is not empty
+    func addSession(title: String, date: Date, location: String, sessionType: String, details: [String: String], images: [UIImage] = [], origin: String? = nil, isPublic: Bool = false) {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty else {
             print("⚠️ Attempted to save session with empty title - skipping")
@@ -148,7 +177,6 @@ final class SessionStore: ObservableObject {
     }
     
     func delete(session: SessionData) {
-        // Remove associated image files
         guard let docs = documentsDirectory() else { return }
         for fileName in session.imageFileNames {
             let url = docs.appendingPathComponent(fileName)
@@ -161,7 +189,6 @@ final class SessionStore: ObservableObject {
             }
         }
         
-        // Remove session from array
         sessions.removeAll { $0.id == session.id }
         save()
     }
@@ -195,4 +222,3 @@ final class SessionStore: ObservableObject {
         return try? encoder.encode(bundle)
     }
 }
-

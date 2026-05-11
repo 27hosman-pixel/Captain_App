@@ -1,5 +1,7 @@
 import SwiftUI
 
+import SwiftUI
+
 /// Light, vibrant stat card with warm gradients
 /// Optimized for positive, motivational sharing
 struct SunriseCardView: View {
@@ -9,8 +11,57 @@ struct SunriseCardView: View {
     let location: String
     let stats: [(label: String, value: String)]
     let format: StatCardFormat
+    let heroImage: UIImage?
     
     var body: some View {
+        ZStack {
+            if let heroImage = heroImage {
+                // Hero photo background with warm gradient overlay
+                heroPhotoBackground(image: heroImage)
+            } else {
+                // Original warm gradient background (no photo)
+                originalGradientBackground
+            }
+            
+            // Content layer
+            contentLayer
+        }
+        .frame(width: format.size.width, height: format.size.height)
+    }
+    
+    // MARK: - Background Layers
+    
+    /// Hero photo with warm, vibrant gradient overlay
+    @ViewBuilder
+    private func heroPhotoBackground(image: UIImage) -> some View {
+        ZStack {
+            // Photo background
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: format.size.width, height: format.size.height)
+                .clipped()
+                .opacity(0.6) // Keep photo more visible for vibrant style
+            
+            // Warm gradient overlay (lighter than Midnight)
+            LinearGradient(
+                colors: [
+                    Color(hex: "FFE66D").opacity(0.3),
+                    Color(hex: "FFA07A").opacity(0.6),
+                    Color(hex: "FF6B6B").opacity(0.75)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            
+            // Decorative circles
+            decorativeCircles
+        }
+    }
+    
+    /// Original gradient background (when no photo)
+    @ViewBuilder
+    private var originalGradientBackground: some View {
         ZStack {
             // Warm gradient background
             LinearGradient(
@@ -24,19 +75,30 @@ struct SunriseCardView: View {
             )
             
             // Decorative circles
-            GeometryReader { geo in
-                Circle()
-                    .fill(Color.white.opacity(0.15))
-                    .frame(width: 300, height: 300)
-                    .offset(x: -100, y: -100)
-                
-                Circle()
-                    .fill(Color.white.opacity(0.1))
-                    .frame(width: 200, height: 200)
-                    .offset(x: geo.size.width - 100, y: geo.size.height - 100)
-            }
+            decorativeCircles
+        }
+    }
+    
+    /// Decorative circles overlay
+    @ViewBuilder
+    private var decorativeCircles: some View {
+        GeometryReader { geo in
+            Circle()
+                .fill(Color.white.opacity(0.15))
+                .frame(width: 300, height: 300)
+                .offset(x: -100, y: -100)
             
-            // Content
+            Circle()
+                .fill(Color.white.opacity(0.1))
+                .frame(width: 200, height: 200)
+                .offset(x: geo.size.width - 100, y: geo.size.height - 100)
+        }
+    }
+    
+    // MARK: - Content Layer
+    
+    @ViewBuilder
+    private var contentLayer: some View {
             VStack(spacing: format == .story ? 48 : 32) {
                 Spacer()
                 
@@ -97,8 +159,6 @@ struct SunriseCardView: View {
                 }
                 .padding(.bottom, format == .story ? 40 : 20)
             }
-        }
-        .frame(width: format.size.width, height: format.size.height)
     }
     
     // MARK: - Stats Grid
@@ -227,7 +287,8 @@ struct SunriseCardView: View {
             ("Passes", "82"),
             ("Saves", "7")
         ],
-        format: .square
+        format: .square,
+        heroImage: nil
     )
 }
 
@@ -243,6 +304,7 @@ struct SunriseCardView: View {
             ("Minutes", "90"),
             ("Shots", "8")
         ],
-        format: .story
+        format: .story,
+        heroImage: nil
     )
 }

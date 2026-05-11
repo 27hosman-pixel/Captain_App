@@ -1,16 +1,19 @@
 import SwiftUI
-
-enum ProfileVisibility: String, CaseIterable, Identifiable {
-    case `public` = "Public"
-    case `private` = "Private"
-    var id: String { rawValue }
-}
+import UserNotifications
 
 enum AppTheme: String, CaseIterable, Identifiable {
     case system = "System"
     case light = "Light"
     case dark = "Dark"
     var id: String { rawValue }
+    
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
 }
 
 enum MeasurementUnit: String, CaseIterable, Identifiable {
@@ -22,21 +25,21 @@ enum MeasurementUnit: String, CaseIterable, Identifiable {
 struct SettingsView: View {
     @EnvironmentObject var router: AppRouter
     @EnvironmentObject var sessionStore: SessionStore
-    @EnvironmentObject var authStore: AuthStore
-    @StateObject private var profileStore = ProfileStore()
+    @EnvironmentObject var previewStore: PreviewStore
+    @EnvironmentObject var profileStore: ProfileStore
 
     // Simple persisted preferences
     @AppStorage("reminders_enabled") private var remindersEnabled: Bool = false
     @AppStorage("reminder_time") private var reminderTime: Double = Date().timeIntervalSinceReferenceDate
-    @AppStorage("default_session_public") private var defaultSessionPublic: Bool = true
     @AppStorage("app_theme") private var appThemeRaw: String = AppTheme.system.rawValue
     @AppStorage("measurement_unit") private var measurementUnitRaw: String = MeasurementUnit.imperial.rawValue
 
     @State private var showingExportShare: Bool = false
     @State private var exportURL: URL?
-    @State private var showingLogoutConfirmation: Bool = false
-    @State private var showingDeleteAccountConfirmation: Bool = false
+    @State private var showingClearProfileConfirmation: Bool = false
+    @State private var showingClearAllDataConfirmation: Bool = false
     @State private var storageSize: String = "Calculating..."
+    @State private var notificationPermissionStatus: UNAuthorizationStatus = .notDetermined
 
     var appTheme: AppTheme {
         get { AppTheme(rawValue: appThemeRaw) ?? .system }
@@ -51,9 +54,7 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section {
-                Button(action: {
-                    router.navigate(.buildProfile)
-                }) {
+                NavigationLink(value: Destination.buildProfile) {
                     HStack {
                         Text("Manage Profile")
                             .font(Theme.Typography.body)
@@ -65,23 +66,37 @@ struct SettingsView: View {
                 }
                 
                 Button(role: .destructive, action: {
-                    profileStore.clear()
+                    showingClearProfileConfirmation = true
                 }) {
-                    Text("Clear Profile")
+                    Text("Clear Profile Only")
+                        .font(Theme.Typography.body)
+                }
+                
+                Button(role: .destructive, action: {
+                    showingClearAllDataConfirmation = true
+                }) {
+                    Text("Clear All Data")
                         .font(Theme.Typography.body)
                 }
             } header: {
-                Text("Account")
+                Text("Profile")
                     .font(Theme.Typography.caption)
                     .foregroundColor(Theme.Colors.secondaryText)
                     .textCase(.uppercase)
+            } footer: {
+                Text("Clear Profile Only removes your personal info. Clear All Data removes profile, sessions, and resets settings.")
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.secondaryText)
             }
             
             // NEW: Appearance Section
             Section {
                 Picker("Theme", selection: Binding(
                     get: { AppTheme(rawValue: appThemeRaw) ?? .system },
-                    set: { appThemeRaw = $0.rawValue }
+                    set: { newTheme in
+                        appThemeRaw = newTheme.rawValue
+                        applyTheme(newTheme)
+                    }
                 )) {
                     ForEach(AppTheme.allCases) { theme in
                         HStack {
@@ -126,19 +141,49 @@ struct SettingsView: View {
             }
 
             Section {
-                Toggle("Remind me to log sessions", isOn: $remindersEnabled)
+                Toggle("Remind me to log sessions", isOn: Binding(
+                    get: { remindersEnabled },
+                    set: { newValue in
+                        remindersEnabled = newValue
+                        if newValue {
+                            requestNotificationPermission()
+                        } else {
+                            cancelScheduledNotifications()
+                        }
+                    }
+                ))
                     .font(Theme.Typography.body)
                 
                 DatePicker(
                     "Reminder time",
                     selection: Binding(
                         get: { Date(timeIntervalSinceReferenceDate: reminderTime) },
-                        set: { newDate in reminderTime = newDate.timeIntervalSinceReferenceDate }
+                        set: { newDate in
+                            reminderTime = newDate.timeIntervalSinceReferenceDate
+                            if remindersEnabled {
+                                scheduleNotification(at: newDate)
+                            }
+                        }
                     ),
                     displayedComponents: .hourAndMinute
                 )
                 .font(Theme.Typography.body)
                 .disabled(!remindersEnabled)
+                
+                if notificationPermissionStatus == .denied {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("⚠️ Notifications Disabled")
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(.orange)
+                        Text("Enable notifications in Settings to receive reminders.")
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.secondaryText)
+                        Button("Open Settings") {
+                            openAppSettings()
+                        }
+                        .font(Theme.Typography.caption)
+                    }
+                }
             } header: {
                 Text("Notifications")
                     .font(Theme.Typography.caption)
@@ -147,28 +192,24 @@ struct SettingsView: View {
             }
 
             Section {
-                Toggle("Default new sessions are Public", isOn: $defaultSessionPublic)
-                    .font(Theme.Typography.body)
-                
-                Text("You can still change visibility per session when logging.")
-                    .font(Theme.Typography.caption)
-                    .foregroundColor(Theme.Colors.secondaryText)
-            } header: {
-                Text("Privacy")
-                    .font(Theme.Typography.caption)
-                    .foregroundColor(Theme.Colors.secondaryText)
-                    .textCase(.uppercase)
-            }
-
-            Section {
-                // NEW: Storage usage display
+                // Storage usage display
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Storage Used")
                             .font(Theme.Typography.body)
-                        Text("\(sessionStore.sessions.count) sessions")
-                            .font(Theme.Typography.caption)
-                            .foregroundColor(Theme.Colors.secondaryText)
+                        HStack(spacing: 4) {
+                            Text("\(sessionStore.sessions.count) sessions")
+                                .font(Theme.Typography.caption)
+                                .foregroundColor(Theme.Colors.secondaryText)
+                            
+                            if !previewStore.drafts.isEmpty {
+                                Text("•")
+                                    .foregroundColor(Theme.Colors.secondaryText)
+                                Text("\(previewStore.drafts.count) drafts")
+                                    .font(Theme.Typography.caption)
+                                    .foregroundColor(Theme.Colors.secondaryText)
+                            }
+                        }
                     }
                     Spacer()
                     Text(storageSize)
@@ -214,8 +255,8 @@ struct SettingsView: View {
             // NEW: Help & Support Section
             Section {
                 Button(action: {
-                    // Open help center
-                    if let url = URL(string: "https://example.com/help") {
+                    // Open help center - Update this URL to your actual help center
+                    if let url = URL(string: "https://www.captainapp.com/help") {
                         UIApplication.shared.open(url)
                     }
                 }) {
@@ -284,35 +325,8 @@ struct SettingsView: View {
                     .font(Theme.Typography.caption)
                     .foregroundColor(Theme.Colors.secondaryText)
                     .textCase(.uppercase)
-            }
-
-            Section {
-                Button(action: {
-                    showingLogoutConfirmation = true
-                }) {
-                    HStack {
-                        Text("Log Out")
-                            .font(Theme.Typography.body)
-                        Spacer()
-                        Image(systemName: "rectangle.portrait.and.arrow.right")
-                            .font(.system(size: Theme.IconSize.sm))
-                            .foregroundColor(Theme.Colors.secondaryText)
-                    }
-                }
-                
-                Button(role: .destructive, action: {
-                    showingDeleteAccountConfirmation = true
-                }) {
-                    Text("Delete Account")
-                        .font(Theme.Typography.body)
-                }
-            } header: {
-                Text("Account Management")
-                    .font(Theme.Typography.caption)
-                    .foregroundColor(Theme.Colors.secondaryText)
-                    .textCase(.uppercase)
             } footer: {
-                Text("Deleting your account will permanently remove all your data including profile, sessions, and media files. This action cannot be undone.")
+                Text("Need help? Contact us or visit our help center for guides and FAQs.")
                     .font(Theme.Typography.caption)
                     .foregroundColor(Theme.Colors.secondaryText)
             }
@@ -327,7 +341,7 @@ struct SettingsView: View {
                         .foregroundColor(Theme.Colors.secondaryText)
                 }
                 
-                Link(destination: URL(string: "https://example.com/privacy")!) {
+                Link(destination: URL(string: "https://www.captainapp.com/privacy")!) {
                     HStack {
                         Text("Privacy Policy")
                             .font(Theme.Typography.body)
@@ -338,7 +352,7 @@ struct SettingsView: View {
                     }
                 }
                 
-                Link(destination: URL(string: "https://example.com/terms")!) {
+                Link(destination: URL(string: "https://www.captainapp.com/terms")!) {
                     HStack {
                         Text("Terms of Service")
                             .font(Theme.Typography.body)
@@ -362,26 +376,28 @@ struct SettingsView: View {
                 ShareSheet(activityItems: [exportURL])
             }
         }
-        .confirmationDialog("Log Out", isPresented: $showingLogoutConfirmation, titleVisibility: .visible) {
-            Button("Log Out", role: .destructive) {
-                logout()
+        .confirmationDialog("Clear Profile Only", isPresented: $showingClearProfileConfirmation, titleVisibility: .visible) {
+            Button("Clear Profile", role: .destructive) {
+                clearProfileOnly()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Are you sure you want to log out? Your data will remain on this device.")
+            Text("This will remove your profile information but keep your sessions and settings.")
         }
-        .confirmationDialog("Delete Account", isPresented: $showingDeleteAccountConfirmation, titleVisibility: .visible) {
-            Button("Delete Account", role: .destructive) {
-                deleteAccount()
+        .confirmationDialog("Clear All Data", isPresented: $showingClearAllDataConfirmation, titleVisibility: .visible) {
+            Button("Clear Everything", role: .destructive) {
+                clearAllData()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will permanently delete your account and all associated data. This action cannot be undone.")
+            Text("This will permanently delete your profile, all sessions, media files, and reset all settings. This cannot be undone.")
         }
         .onAppear {
             router.current = .settings
             calculateStorageSize()
+            checkNotificationPermission()
         }
+        .preferredColorScheme(appTheme.colorScheme)
     }
     
     // MARK: - Helper Functions
@@ -411,6 +427,7 @@ struct SettingsView: View {
                 return
             }
             
+            // Session images
             let allImageNames = sessionStore.sessions.flatMap { $0.imageFileNames }
             for imageName in allImageNames {
                 let imageURL = docsURL.appendingPathComponent(imageName)
@@ -420,7 +437,17 @@ struct SettingsView: View {
                 }
             }
             
-            // Also check profile photo
+            // Draft images
+            let allDraftImageNames = previewStore.drafts.flatMap { $0.imageFileNames }
+            for imageName in allDraftImageNames {
+                let imageURL = docsURL.appendingPathComponent(imageName)
+                if let attributes = try? FileManager.default.attributesOfItem(atPath: imageURL.path),
+                   let fileSize = attributes[.size] as? Int64 {
+                    totalSize += fileSize
+                }
+            }
+            
+            // Profile photo
             let profilePhotoURL = docsURL.appendingPathComponent("profile_photo.jpg")
             if let attributes = try? FileManager.default.attributesOfItem(atPath: profilePhotoURL.path),
                let fileSize = attributes[.size] as? Int64 {
@@ -490,8 +517,93 @@ struct SettingsView: View {
     }
     
     private func rateApp() {
-        // In a real app, replace with your actual App Store ID
-        if let url = URL(string: "https://apps.apple.com/app/idYOUR_APP_ID?action=write-review") {
+        // Update this with your actual App Store ID when published
+        // Format: https://apps.apple.com/app/id{YOUR_APP_ID}?action=write-review
+        if let url = URL(string: "https://apps.apple.com/app/id123456789?action=write-review") {
+            UIApplication.shared.open(url)
+        }
+    }
+    
+    // MARK: - Theme Management
+    
+    private func applyTheme(_ theme: AppTheme) {
+        // The theme is applied via .preferredColorScheme modifier on the view
+        // This happens automatically when appThemeRaw changes
+        print("Theme changed to: \(theme.rawValue)")
+    }
+    
+    // MARK: - Notification Management
+    
+    private func checkNotificationPermission() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                self.notificationPermissionStatus = settings.authorizationStatus
+            }
+        }
+    }
+    
+    private func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            DispatchQueue.main.async {
+                if granted {
+                    self.notificationPermissionStatus = .authorized
+                    self.scheduleNotification(at: Date(timeIntervalSinceReferenceDate: self.reminderTime))
+                } else {
+                    self.notificationPermissionStatus = .denied
+                    self.remindersEnabled = false
+                }
+                
+                if let error = error {
+                    print("Error requesting notification permission: \(error)")
+                }
+            }
+        }
+    }
+    
+    private func scheduleNotification(at date: Date) {
+        // Remove existing notifications first
+        cancelScheduledNotifications()
+        
+        guard remindersEnabled else { return }
+        
+        // Create notification content
+        let content = UNMutableNotificationContent()
+        content.title = "Time to Log Your Session!"
+        content.body = "Don't forget to track your training progress today."
+        content.sound = .default
+        content.categoryIdentifier = "SESSION_REMINDER"
+        
+        // Extract hour and minute from the selected time
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.hour, .minute], from: date)
+        
+        // Create a daily repeating trigger
+        var dateComponents = DateComponents()
+        dateComponents.hour = components.hour
+        dateComponents.minute = components.minute
+        
+        let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
+        
+        // Create the request
+        let request = UNNotificationRequest(identifier: "daily_session_reminder", content: content, trigger: trigger)
+        
+        // Schedule the notification
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("Error scheduling notification: \(error)")
+            } else {
+                print("✅ Scheduled daily reminder at \(components.hour ?? 0):\(String(format: "%02d", components.minute ?? 0))")
+            }
+        }
+    }
+    
+    private func cancelScheduledNotifications() {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["daily_session_reminder"])
+        print("🔕 Cancelled scheduled notifications")
+    }
+    
+    private func openAppSettings() {
+        if let url = URL(string: UIApplication.openSettingsURLString) {
             UIApplication.shared.open(url)
         }
     }
@@ -527,25 +639,36 @@ struct SettingsView: View {
         return "v\(v) (\(b))"
     }
     
-    private func logout() {
-        authStore.logout()
-        router.replaceWith(.login)
+    // MARK: - Data Management
+    
+    private func clearProfileOnly() {
+        profileStore.clear()
+        // Navigate back to landing page since profile is now empty
+        NotificationCenter.default.post(name: Notification.Name("ProfileCompleted"), object: nil)
     }
     
-    private func deleteAccount() {
+    private func clearAllData() {
+        // Cancel any scheduled notifications
+        cancelScheduledNotifications()
+        
         // Delete all data
         sessionStore.deleteAllSessionMediaFiles()
         sessionStore.clearAll()
         profileStore.clear()
+        previewStore.clearAllDrafts()
+        previewStore.clear()
         
-        // Clear preferences
+        // Reset all preferences to defaults
         remindersEnabled = false
         reminderTime = Date().timeIntervalSinceReferenceDate
-        defaultSessionPublic = true
+        appThemeRaw = AppTheme.system.rawValue
+        measurementUnitRaw = MeasurementUnit.imperial.rawValue
         
-        // Log out and navigate to login
-        authStore.logout()
-        router.replaceWith(.login)
+        // Recalculate storage
+        calculateStorageSize()
+        
+        // Navigate back to landing page
+        NotificationCenter.default.post(name: Notification.Name("ProfileCompleted"), object: nil)
     }
 }
 
@@ -566,7 +689,8 @@ struct SettingsView_Previews: PreviewProvider {
             SettingsView()
                 .environmentObject(AppRouter())
                 .environmentObject(SessionStore())
-                .environmentObject(AuthStore())
+                .environmentObject(PreviewStore())
+                .environmentObject(ProfileStore())
         }
     }
 }

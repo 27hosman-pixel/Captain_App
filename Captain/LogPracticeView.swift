@@ -33,10 +33,6 @@ struct LogPracticeView: View {
     // Photos
     @State private var selectedItems: [PhotosPickerItem] = []
     @State private var selectedImages: [UIImage] = []
-
-    // Visibility default from Settings
-    @AppStorage("default_session_public") private var defaultSessionPublic: Bool = true
-    @State private var isPublic: Bool = true
     
     // Track the last loaded draft ID to prevent double-loading the same draft
     @State private var loadedDraftId: UUID?
@@ -188,16 +184,6 @@ struct LogPracticeView: View {
                 
                 // Footer actions
                 VStack(spacing: 12) {
-                    Toggle(isOn: $isPublic) {
-                        HStack {
-                            Image(systemName: isPublic ? "globe" : "lock.fill")
-                            Text(isPublic ? "Public" : "Private")
-                        }
-                    }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(10)
-                    
                     Button(action: saveSession) {
                         Text("Save Practice")
                             .font(.headline)
@@ -226,8 +212,13 @@ struct LogPracticeView: View {
         .navigationTitle("Log Practice")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            isPublic = defaultSessionPublic
             loadDraftIfNeeded()
+        }
+        .onChange(of: router.path.count) { oldValue, newValue in
+            // When navigating back from preview (path count decreases)
+            if newValue < oldValue {
+                loadDraftIfNeeded()
+            }
         }
     }
     
@@ -239,31 +230,28 @@ struct LogPracticeView: View {
         print("🏈 previewStore.sessionType: '\(previewStore.sessionType)'")
         print("🏈 previewStore.details: \(previewStore.details)")
         
-        // Check if we have draft data AND we haven't loaded THIS specific draft yet
-        guard let draftId = previewStore.currentDraftId,
-              loadedDraftId != draftId,
-              !previewStore.title.isEmpty else {
-            print("🏈 LogPracticeView: Skipping draft load")
-            print("   - Has currentDraftId: \(previewStore.currentDraftId != nil)")
-            print("   - Already loaded this draft: \(loadedDraftId == previewStore.currentDraftId)")
-            print("   - Has title: \(!previewStore.title.isEmpty)")
+        guard !previewStore.title.isEmpty else {
+            print("🏈 LogPracticeView: Skipping draft load - no title in PreviewStore")
             return
         }
         
-        print("🏈 LogPracticeView: ✅ Loading draft data...")
+        if let draftId = previewStore.currentDraftId, loadedDraftId == draftId {
+            print("🏈 LogPracticeView: Skipping draft load - already loaded this draft")
+            return
+        }
         
-        // Load data from PreviewStore (from a resumed draft)
+        if !title.isEmpty && title != previewStore.title {
+            print("🏈 LogPracticeView: Skipping draft load - form has different data")
+            return
+        }
+        
+        print("🏈 LogPracticeView: ✅ Loading data from PreviewStore...")
+        
         title = previewStore.title
         date = previewStore.date
         location = previewStore.location
-        isPublic = previewStore.isPublic
         selectedImages = previewStore.images
         
-        print("🏈 Set title to: '\(title)'")
-        print("🏈 Set location to: '\(location)'")
-        print("🏈 Set images count: \(selectedImages.count)")
-        
-        // Parse details
         if let type = previewStore.details["Type"] {
             sessionType = type
             print("🏈 Loaded session type: \(type)")
@@ -289,13 +277,14 @@ struct LogPracticeView: View {
             print("🏈 Loaded notes: \(notesStr)")
         }
         
-        // Mark this draft as loaded
-        loadedDraftId = draftId
-        print("🏈 LogPracticeView: ✅ Draft loaded successfully! Marked as loaded: \(draftId)")
+        if let draftId = previewStore.currentDraftId {
+            loadedDraftId = draftId
+        }
+        
+        print("🏈 LogPracticeView: ✅ Draft loaded successfully!")
     }
 
     private func saveSession() {
-        // Dismiss keyboard so the tap isn’t blocked and UI updates proceed
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
 
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -317,10 +306,9 @@ struct LogPracticeView: View {
         NotificationCenter.default.post(
             name: Notification.Name("SetPreview"),
             object: nil,
-            userInfo: ["title": trimmedTitle, "date": date, "location": location, "type": "Practice", "details": details, "images": selectedImages, "origin": "practice", "isPublic": isPublic]
+            userInfo: ["title": trimmedTitle, "date": date, "location": location, "type": "Practice", "details": details, "images": selectedImages, "origin": "practice"]
         )
 
-        // Belt-and-suspenders: also signal ContentView to navigate
         NotificationCenter.default.post(name: Notification.Name("NavigateToPreview"), object: nil)
 
         Task { @MainActor in

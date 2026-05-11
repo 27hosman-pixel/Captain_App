@@ -1,5 +1,7 @@
 import SwiftUI
 
+import SwiftUI
+
 /// Dark gradient stat card with neon accents
 /// Optimized for social media sharing with high visual impact
 struct MidnightCardView: View {
@@ -9,8 +11,63 @@ struct MidnightCardView: View {
     let location: String
     let stats: [(label: String, value: String)]
     let format: StatCardFormat
+    let heroImage: UIImage?
     
     var body: some View {
+        ZStack {
+            if let heroImage = heroImage {
+                // Hero photo background with dark gradient overlay
+                heroPhotoBackground(image: heroImage)
+                    .onAppear {
+                        print("🌙 MidnightCard: Rendering WITH hero image, size: \(heroImage.size)")
+                    }
+            } else {
+                // Original gradient background (no photo)
+                originalGradientBackground
+                    .onAppear {
+                        print("🌙 MidnightCard: Rendering WITHOUT hero image")
+                    }
+            }
+            
+            // Content layer
+            contentLayer
+        }
+        .frame(width: format.size.width, height: format.size.height)
+    }
+    
+    // MARK: - Background Layers
+    
+    /// Hero photo with dramatic dark gradient overlay
+    @ViewBuilder
+    private func heroPhotoBackground(image: UIImage) -> some View {
+        ZStack {
+            // Photo background
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: format.size.width, height: format.size.height)
+                .clipped()
+                .opacity(0.5) // Dim the photo for text readability
+            
+            // Dark gradient overlay (heavier at bottom for text)
+            LinearGradient(
+                colors: [
+                    Color(hex: "0f0c29").opacity(0.4),
+                    Color(hex: "24243e").opacity(0.8),
+                    Color(hex: "0f0c29").opacity(0.95)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            
+            // Subtle grid pattern overlay
+            gridPattern
+        }
+    }
+    
+    /// Original gradient background (when no photo)
+    @ViewBuilder
+    private var originalGradientBackground: some View {
         ZStack {
             // Background gradient - deep purples and blues
             LinearGradient(
@@ -24,24 +81,35 @@ struct MidnightCardView: View {
             )
             
             // Subtle grid pattern overlay
-            GeometryReader { geo in
-                Path { path in
-                    let spacing: CGFloat = 40
-                    // Vertical lines
-                    for i in stride(from: 0, to: geo.size.width, by: spacing) {
-                        path.move(to: CGPoint(x: i, y: 0))
-                        path.addLine(to: CGPoint(x: i, y: geo.size.height))
-                    }
-                    // Horizontal lines
-                    for i in stride(from: 0, to: geo.size.height, by: spacing) {
-                        path.move(to: CGPoint(x: 0, y: i))
-                        path.addLine(to: CGPoint(x: geo.size.width, y: i))
-                    }
+            gridPattern
+        }
+    }
+    
+    /// Grid pattern overlay
+    @ViewBuilder
+    private var gridPattern: some View {
+        GeometryReader { geo in
+            Path { path in
+                let spacing: CGFloat = 40
+                // Vertical lines
+                for i in stride(from: 0, to: geo.size.width, by: spacing) {
+                    path.move(to: CGPoint(x: i, y: 0))
+                    path.addLine(to: CGPoint(x: i, y: geo.size.height))
                 }
-                .stroke(Color.white.opacity(0.03), lineWidth: 1)
+                // Horizontal lines
+                for i in stride(from: 0, to: geo.size.height, by: spacing) {
+                    path.move(to: CGPoint(x: 0, y: i))
+                    path.addLine(to: CGPoint(x: geo.size.width, y: i))
+                }
             }
-            
-            // Content
+            .stroke(Color.white.opacity(0.03), lineWidth: 1)
+        }
+    }
+    
+    // MARK: - Content Layer
+    
+    @ViewBuilder
+    private var contentLayer: some View {
             VStack(spacing: format == .story ? 48 : 32) {
                 Spacer()
                 
@@ -106,8 +174,6 @@ struct MidnightCardView: View {
                 }
                 .padding(.bottom, format == .story ? 40 : 20)
             }
-        }
-        .frame(width: format.size.width, height: format.size.height)
     }
     
     // MARK: - Stats Grid
@@ -235,7 +301,8 @@ struct MidnightCardView: View {
             ("Shots", "5"),
             ("Passes", "42")
         ],
-        format: .square
+        format: .square,
+        heroImage: nil
     )
 }
 
@@ -251,6 +318,7 @@ struct MidnightCardView: View {
             ("Drills", "12"),
             ("Distance", "3.2 mi")
         ],
-        format: .story
+        format: .story,
+        heroImage: nil
     )
 }

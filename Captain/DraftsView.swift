@@ -2,7 +2,6 @@ import SwiftUI
 
 struct DraftsView: View {
     @EnvironmentObject var previewStore: PreviewStore
-    @EnvironmentObject var router: AppRouter
     @State private var draftToDelete: PreviewData?
     @State private var showingDeleteConfirmation = false
     
@@ -32,19 +31,18 @@ struct DraftsView: View {
                                 // Resume editing this draft
                                 previewStore.loadDraft(draft)
                                 
-                                // Give a tiny delay for the @Published properties to update
-                                // before navigating to the editing view
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                                    // Navigate to the appropriate editing view based on session type
+                                // Navigate to appropriate Log view using NotificationCenter
+                                // (ensures proper cross-tab navigation to Log tab)
+                                DispatchQueue.main.async {
                                     switch draft.sessionType.lowercased() {
                                     case "practice":
-                                        router.navigate(.logPractice)
+                                        NotificationCenter.default.post(name: Notification.Name("NavigateToLogPractice"), object: nil)
                                     case "game":
-                                        router.navigate(.logGame)
-                                    case "training":
-                                        router.navigate(.logWorkout)
+                                        NotificationCenter.default.post(name: Notification.Name("NavigateToLogGame"), object: nil)
+                                    case "training", "workout":
+                                        NotificationCenter.default.post(name: Notification.Name("NavigateToLogWorkout"), object: nil)
                                     default:
-                                        router.navigate(.logPractice)
+                                        NotificationCenter.default.post(name: Notification.Name("NavigateToLogPractice"), object: nil)
                                     }
                                 }
                             } onDelete: {
@@ -130,10 +128,7 @@ private struct DraftCard: View {
             
             // Action buttons
             HStack(spacing: Theme.Spacing.sm) {
-                Button {
-                    print("🔵 BUTTON ACTION FIRED!")
-                    onResume()
-                } label: {
+                Button(action: onResume) {
                     HStack {
                         Spacer()
                         Text("Resume Editing")
@@ -147,10 +142,7 @@ private struct DraftCard: View {
                     .cornerRadius(Theme.CornerRadius.sm)
                 }
                 
-                Button {
-                    print("🗑️ DELETE BUTTON FIRED!")
-                    onDelete()
-                } label: {
+                Button(action: onDelete) {
                     Image(systemName: "trash")
                         .font(.system(size: 16))
                         .foregroundColor(.red)
@@ -216,7 +208,6 @@ struct DraftsView_Previews: PreviewProvider {
         NavigationView {
             DraftsView()
                 .environmentObject(PreviewStore())
-                .environmentObject(AppRouter())
         }
     }
 }

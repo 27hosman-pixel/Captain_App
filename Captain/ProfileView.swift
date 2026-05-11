@@ -66,49 +66,6 @@ struct ProfileView: View {
                     }
                     .padding(.horizontal, Theme.Spacing.md)
                     .padding(.top, Theme.Spacing.md)
-                    
-                    // Stats row
-                    HStack(spacing: 0) {
-                        // V2_FEATURE: Social following (hidden in V1)
-                        if FeatureFlags.followSystem {
-                            StatColumn(title: "Following", value: "\(store.profile.following)")
-                            StatColumn(title: "Followers", value: "\(store.profile.followers)")
-                        }
-                        StatColumn(title: "Activities", value: "\(sessionStore.sessions.count)")
-                    }
-                    .padding(.horizontal, Theme.Spacing.md)
-                    
-                    // Action buttons
-                    HStack(spacing: Theme.Spacing.sm) {
-                        NavigationLink(value: Destination.buildProfile) {
-                            Text("Edit Profile")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(Theme.Colors.primary)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(Theme.Colors.primary, lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        
-                        Button(action: {
-                            shareProfile()
-                        }) {
-                            Text("Share")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(Theme.Colors.primary)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(Theme.Colors.primary, lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .padding(.horizontal, Theme.Spacing.md)
                 }
                 .padding(.bottom, Theme.Spacing.lg)
 
@@ -351,35 +308,9 @@ struct ProfileView: View {
         if let years = comps.year { return String(years) }
         return "—"
     }
-
-    private func shareProfile() {
-        let text = "Check out my Captain profile: \(displayName())"
-        let vc = UIActivityViewController(activityItems: [text], applicationActivities: nil)
-        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let root = scene.windows.first?.rootViewController {
-            root.present(vc, animated: true)
-        }
-    }
 }
 
 // MARK: - Subviews
-
-private struct StatColumn: View {
-    let title: String
-    let value: String
-    
-    var body: some View {
-        VStack(spacing: 4) {
-            Text(value)
-                .font(.system(size: 18, weight: .semibold))
-            Text(title)
-                .font(.system(size: 13))
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
 
 private struct GoalsRow: View {
     let day: String

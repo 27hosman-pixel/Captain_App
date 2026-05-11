@@ -10,12 +10,12 @@ struct PreviewData: Identifiable, Codable {
     var location: String
     var sessionType: String
     var details: [String: String]
-    var imageFileNames: [String]  // Changed from UIImage to filenames for persistence
+    var imageFileNames: [String]
     var origin: String?
     var isPublic: Bool
-    var savedAt: Date  // Track when draft was saved
+    var savedAt: Date
     
-    init(id: UUID = UUID(), title: String, date: Date, location: String, sessionType: String, details: [String: String], imageFileNames: [String] = [], origin: String? = nil, isPublic: Bool = true, savedAt: Date = Date()) {
+    init(id: UUID = UUID(), title: String, date: Date, location: String, sessionType: String, details: [String: String], imageFileNames: [String] = [], origin: String? = nil, isPublic: Bool = false, savedAt: Date = Date()) {
         self.id = id
         self.title = title
         self.date = date
@@ -35,14 +35,13 @@ final class PreviewStore: ObservableObject {
     @Published var date: Date = Date()
     @Published var location: String = ""
     @Published var sessionType: String = ""
-    @Published var details: [String: String] = [:] // arbitrary key-value pairs (goals, stats, etc)
+    @Published var details: [String: String] = [:]
     @Published var images: [UIImage] = []
     @Published var origin: String? = nil
-    @Published var isPublic: Bool = true
+    @Published var isPublic: Bool = false
 
     @Published var drafts: [PreviewData] = []
     
-    // Track if current preview is from a draft (so we can delete it when posted)
     var currentDraftId: UUID? = nil
     
     private let draftsFile = "drafts.json"
@@ -65,13 +64,11 @@ final class PreviewStore: ObservableObject {
         if let det = userInfo["details"] as? [String: String] { details = det }
         if let imgs = userInfo["images"] as? [UIImage] { images = imgs }
         if let o = userInfo["origin"] as? String { origin = o }
-        if let p = userInfo["isPublic"] as? Bool { isPublic = p }
         
-        // This is a new preview from an editing form, not from a draft
         currentDraftId = nil
     }
 
-    func setPreview(title: String, date: Date, location: String, sessionType: String, details: [String: String], images: [UIImage], origin: String? = nil, isPublic: Bool = true) {
+    func setPreview(title: String, date: Date, location: String, sessionType: String, details: [String: String], images: [UIImage], origin: String? = nil) {
         self.title = title
         self.date = date
         self.location = location
@@ -79,22 +76,19 @@ final class PreviewStore: ObservableObject {
         self.details = details
         self.images = images
         self.origin = origin
-        self.isPublic = isPublic
-        currentDraftId = nil  // This is a new session, not from a draft
+        self.isPublic = false
+        currentDraftId = nil
     }
 
     func saveDraft() {
-        // If we're updating an existing draft, use its ID; otherwise create new
         let draftId = currentDraftId ?? UUID()
         
-        // If updating existing draft, remove the old one first
         if let existingId = currentDraftId {
             if let existing = drafts.first(where: { $0.id == existingId }) {
                 deleteDraft(existing)
             }
         }
         
-        // Save images to disk
         let imageFileNames = storeDraftImages(images, for: draftId)
         
         let data = PreviewData(
@@ -106,38 +100,35 @@ final class PreviewStore: ObservableObject {
             details: details,
             imageFileNames: imageFileNames,
             origin: origin,
-            isPublic: isPublic,
+            isPublic: false,
             savedAt: Date()
         )
-        drafts.insert(data, at: 0)  // Insert at beginning so newest drafts appear first
-        currentDraftId = draftId  // Track this draft
+        drafts.insert(data, at: 0)
+        currentDraftId = draftId
         saveDrafts()
     }
     
     func loadDraft(_ draft: PreviewData) {
         print("📝 PreviewStore: Loading draft '\(draft.title)'")
-        currentDraftId = draft.id  // Track which draft we're editing
+        currentDraftId = draft.id
         title = draft.title
         date = draft.date
         location = draft.location
         sessionType = draft.sessionType
         details = draft.details
         origin = draft.origin
-        isPublic = draft.isPublic
+        isPublic = false
         
-        // Load images from disk
         images = draft.imageFileNames.compactMap { loadDraftImage(fileName: $0) }
         
         print("📝 PreviewStore: Loaded - Title: '\(title)', Type: '\(sessionType)', Details: \(details.count) items")
     }
     
     func deleteDraft(_ draft: PreviewData) {
-        // Delete associated images
         for fileName in draft.imageFileNames {
             deleteDraftImage(fileName: fileName)
         }
         
-        // Remove from array
         drafts.removeAll { $0.id == draft.id }
         saveDrafts()
     }
@@ -146,6 +137,24 @@ final class PreviewStore: ObservableObject {
         if let draft = drafts.first(where: { $0.id == id }) {
             deleteDraft(draft)
         }
+    }
+    
+    /// Clear all drafts and their associated image files
+    func clearAllDrafts() {
+        // Delete all draft images
+        for draft in drafts {
+            for fileName in draft.imageFileNames {
+                deleteDraftImage(fileName: fileName)
+            }
+        }
+        
+        // Clear the drafts array
+        drafts.removeAll()
+        
+        // Save empty array to disk
+        saveDrafts()
+        
+        print("🗑️ PreviewStore: Cleared all drafts and associated images")
     }
 
     func clear() {
@@ -156,8 +165,8 @@ final class PreviewStore: ObservableObject {
         details = [:]
         images = []
         origin = nil
-        isPublic = true
-        currentDraftId = nil  // Clear the draft tracking
+        isPublic = false
+        currentDraftId = nil
     }
     
     // MARK: - Persistence

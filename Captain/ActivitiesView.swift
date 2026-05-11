@@ -16,7 +16,7 @@ struct ActivitiesView: View {
                     ForEach(sessionStore.sessions.filter { !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) { s in
                         NavigationLink(value: s) {
                             HStack(spacing: Theme.Spacing.sm) {
-                                // Thumbnail image
+                                // Thumbnail image or icon
                                 if let first = s.imageFileNames.first, 
                                    let img = sessionStore.image(for: first) {
                                     Image(uiImage: img)
@@ -26,10 +26,16 @@ struct ActivitiesView: View {
                                         .clipped()
                                         .cornerRadius(Theme.CornerRadius.sm)
                                 } else {
-                                    Rectangle()
-                                        .fill(Color(.systemGray5))
-                                        .frame(width: 60, height: 60)
-                                        .cornerRadius(Theme.CornerRadius.sm)
+                                    // Show icon based on session type
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                            .fill(iconColor(for: s.sessionType).opacity(0.15))
+                                            .frame(width: 60, height: 60)
+                                        
+                                        Image(systemName: iconName(for: s.sessionType))
+                                            .font(.system(size: 28, weight: .medium))
+                                            .foregroundColor(iconColor(for: s.sessionType))
+                                    }
                                 }
 
                                 // Session info
@@ -78,6 +84,34 @@ struct ActivitiesView: View {
                     .padding(.top, Theme.Spacing.xs)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
+        }
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func iconName(for sessionType: String) -> String {
+        switch sessionType.lowercased() {
+        case "practice":
+            return "figure.soccer"
+        case "game":
+            return "trophy.fill"
+        case "training", "workout":
+            return "dumbbell.fill"
+        default:
+            return "sportscourt.fill"
+        }
+    }
+    
+    private func iconColor(for sessionType: String) -> Color {
+        switch sessionType.lowercased() {
+        case "practice":
+            return .blue
+        case "game":
+            return .orange
+        case "training", "workout":
+            return .green
+        default:
+            return .purple
         }
     }
 }

@@ -56,19 +56,6 @@ enum DateRangeFilter: String, CaseIterable, Codable {
     }
 }
 
-enum SourceFilter: String, CaseIterable, Codable {
-    case everyone = "Everyone"
-    case myActivities = "My Activities"
-    
-    var displayName: String { rawValue }
-    var icon: String {
-        switch self {
-        case .everyone: return "person.2"
-        case .myActivities: return "person"
-        }
-    }
-}
-
 // MARK: - Feed Filters Store
 
 final class FeedFilters: ObservableObject {
@@ -76,12 +63,10 @@ final class FeedFilters: ObservableObject {
     // Published properties for reactive UI
     @Published var activityTypes: Set<ActivityTypeFilter> = [.all]
     @Published var dateRange: DateRangeFilter = .allTime
-    @Published var source: SourceFilter = .everyone
     
     // Persistence keys
     private let activityTypesKey = "feed_filter_activity_types"
     private let dateRangeKey = "feed_filter_date_range"
-    private let sourceKey = "feed_filter_source"
     
     init() {
         loadFilters()
@@ -100,11 +85,6 @@ final class FeedFilters: ObservableObject {
         
         // Date range is active if not "All Time"
         if dateRange != .allTime {
-            count += 1
-        }
-        
-        // Source is active if set to "My Activities"
-        if source == .myActivities {
             count += 1
         }
         
@@ -146,51 +126,31 @@ final class FeedFilters: ObservableObject {
         saveFilters()
     }
     
-    func setSource(_ newSource: SourceFilter) {
-        source = newSource
-        saveFilters()
-    }
-    
     func clearAll() {
         activityTypes = [.all]
         dateRange = .allTime
-        source = .everyone
         saveFilters()
     }
     
     // MARK: - Filtering Logic
     
     func matches(session: SessionData) -> Bool {
-        print("🔍 Filtering session: '\(session.title)' (type: '\(session.sessionType)')")
-        print("   Current filters - Activity: \(activityTypes), Date: \(dateRange.displayName), Source: \(source.displayName)")
-        
         // Check activity type
         if !activityTypes.contains(.all) {
             let sessionTypeMatches = activityTypes.contains { filter in
                 session.sessionType.lowercased().contains(filter.rawValue.lowercased())
             }
             if !sessionTypeMatches {
-                print("   ❌ Failed activity type filter")
                 return false
             }
-            print("   ✅ Activity type filter passed")
-        } else {
-            print("   ✅ Activity type filter: ALL (pass)")
         }
         
         // Check date range
         if !dateRange.matches(date: session.date) {
-            print("   ❌ Failed date range filter: \(dateRange.displayName)")
             return false
-        } else {
-            print("   ✅ Date range filter passed: \(dateRange.displayName)")
         }
         
-        // Check source - FIX: Should pass for both Everyone and My Activities
-        // Since all current sessions are the user's own posts
-        print("   ✅ Source filter passed: \(source.displayName)")
-        
-        print("   ✅✅✅ ALL FILTERS PASSED - Session should display!")
+        // All filters passed
         return true
     }
     
@@ -203,9 +163,6 @@ final class FeedFilters: ObservableObject {
         
         // Save date range
         UserDefaults.standard.set(dateRange.rawValue, forKey: dateRangeKey)
-        
-        // Save source
-        UserDefaults.standard.set(source.rawValue, forKey: sourceKey)
     }
     
     private func loadFilters() {
@@ -221,12 +178,6 @@ final class FeedFilters: ObservableObject {
         if let savedRange = UserDefaults.standard.string(forKey: dateRangeKey),
            let range = DateRangeFilter(rawValue: savedRange) {
             dateRange = range
-        }
-        
-        // Load source
-        if let savedSource = UserDefaults.standard.string(forKey: sourceKey),
-           let sourceValue = SourceFilter(rawValue: savedSource) {
-            source = sourceValue
         }
     }
 }

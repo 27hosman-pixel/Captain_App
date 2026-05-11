@@ -26,6 +26,12 @@ struct PlayerProfile: Codable {
 final class ProfileStore: ObservableObject {
     @Published var profile: PlayerProfile = PlayerProfile()
     private let key = "player_profile_v1"
+    
+    /// Check if user has completed their profile (minimum required fields)
+    var hasProfile: Bool {
+        !profile.firstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !profile.lastName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     init() {
         load()
@@ -104,7 +110,7 @@ final class ProfileStore: ObservableObject {
 
 struct BuildProfileView: View {
     @StateObject private var store = ProfileStore()
-    @EnvironmentObject var authStore: AuthStore
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         Form {
@@ -138,16 +144,18 @@ struct BuildProfileView: View {
             }
 
             Section {
-                Button("Save") {
+                Button("Save Profile") {
                     store.save()
-                    authStore.markProfileCompleted()
-                    // Post a notification; ContentView listens and navigates safely
-                    NotificationCenter.default.post(name: Notification.Name("NavigateToProfile"), object: nil)
+                    // Post notification to navigate to main app
+                    NotificationCenter.default.post(name: Notification.Name("ProfileCompleted"), object: nil)
                 }
-                Button("Clear") {
-                    store.clear()
+                .disabled(!store.hasProfile)
+                
+                if !store.hasProfile {
+                    Text("Please enter at least your first and last name")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
-                .foregroundColor(.red)
             }
         }
         .navigationTitle("Build Your Profile")
@@ -163,7 +171,8 @@ struct BuildProfileView: View {
 
 struct BuildProfileView_Previews: PreviewProvider {
     static var previews: some View {
-        BuildProfileView()
-            .environmentObject(AuthStore())
+        NavigationStack {
+            BuildProfileView()
+        }
     }
 }
