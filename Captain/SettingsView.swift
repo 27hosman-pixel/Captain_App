@@ -255,16 +255,13 @@ struct SettingsView: View {
             // NEW: Help & Support Section
             Section {
                 Button(action: {
-                    // Open help center - Update this URL to your actual help center
-                    if let url = URL(string: "https://www.captainapp.com/help") {
-                        UIApplication.shared.open(url)
-                    }
+                    openSupportForm()
                 }) {
                     HStack {
-                        Image(systemName: "questionmark.circle")
+                        Image(systemName: "envelope")
                             .font(.system(size: Theme.IconSize.md))
                             .foregroundColor(Theme.Colors.primary)
-                        Text("Help Center")
+                        Text("Contact Support")
                             .font(Theme.Typography.body)
                         Spacer()
                         Image(systemName: "arrow.up.right")
@@ -274,23 +271,7 @@ struct SettingsView: View {
                 }
                 
                 Button(action: {
-                    sendSupportEmail()
-                }) {
-                    HStack {
-                        Image(systemName: "envelope")
-                            .font(.system(size: Theme.IconSize.md))
-                            .foregroundColor(Theme.Colors.primary)
-                        Text("Contact Support")
-                            .font(Theme.Typography.body)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: Theme.IconSize.sm))
-                            .foregroundColor(Theme.Colors.secondaryText)
-                    }
-                }
-                
-                Button(action: {
-                    sendBugReport()
+                    openSupportForm()
                 }) {
                     HStack {
                         Image(systemName: "ladybug")
@@ -299,7 +280,7 @@ struct SettingsView: View {
                         Text("Report a Bug")
                             .font(Theme.Typography.body)
                         Spacer()
-                        Image(systemName: "chevron.right")
+                        Image(systemName: "arrow.up.right")
                             .font(.system(size: Theme.IconSize.sm))
                             .foregroundColor(Theme.Colors.secondaryText)
                     }
@@ -326,7 +307,7 @@ struct SettingsView: View {
                     .foregroundColor(Theme.Colors.secondaryText)
                     .textCase(.uppercase)
             } footer: {
-                Text("Need help? Contact us or visit our help center for guides and FAQs.")
+                Text("Need help or found an issue? Let us know through our support form.")
                     .font(Theme.Typography.caption)
                     .foregroundColor(Theme.Colors.secondaryText)
             }
@@ -341,7 +322,7 @@ struct SettingsView: View {
                         .foregroundColor(Theme.Colors.secondaryText)
                 }
                 
-                Link(destination: URL(string: "https://www.captainapp.com/privacy")!) {
+                Link(destination: URL(string: "https://docs.google.com/document/d/e/2PACX-1vRMsK1DejOtJKaxrkXVLIXoelPXa8VzL34DbyyQJx69uNTqjfoJRbqS0VgrWTh8LSTmNMd_NKpapnJh/pub")!) {
                     HStack {
                         Text("Privacy Policy")
                             .font(Theme.Typography.body)
@@ -352,7 +333,7 @@ struct SettingsView: View {
                     }
                 }
                 
-                Link(destination: URL(string: "https://www.captainapp.com/terms")!) {
+                Link(destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!) {
                     HStack {
                         Text("Terms of Service")
                             .font(Theme.Typography.body)
@@ -467,59 +448,16 @@ struct SettingsView: View {
         return formatter.string(fromByteCount: bytes)
     }
     
-    private func sendSupportEmail() {
-        let email = "support@captainapp.com"
-        let subject = "Captain Support Request"
-        let body = """
-        
-        
-        ---
-        App Version: \(appVersionString())
-        Device: \(UIDevice.current.model)
-        iOS Version: \(UIDevice.current.systemVersion)
-        """
-        
-        let coded = "mailto:\(email)?subject=\(subject)&body=\(body)"
-            .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
-        
-        if let coded = coded, let url = URL(string: coded) {
-            UIApplication.shared.open(url)
-        }
-    }
-    
-    private func sendBugReport() {
-        let email = "bugs@captainapp.com"
-        let subject = "Bug Report - Captain"
-        let body = """
-        Please describe the bug:
-        
-        
-        Steps to reproduce:
-        1. 
-        2. 
-        3. 
-        
-        Expected behavior:
-        
-        
-        ---
-        App Version: \(appVersionString())
-        Device: \(UIDevice.current.model)
-        iOS Version: \(UIDevice.current.systemVersion)
-        """
-        
-        let coded = "mailto:\(email)?subject=\(subject)&body=\(body)"
-            .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
-        
-        if let coded = coded, let url = URL(string: coded) {
+    private func openSupportForm() {
+        // Opens Google Form for support and bug reports
+        if let url = URL(string: "https://forms.gle/Tu22YPaR8gjZn2HD9") {
             UIApplication.shared.open(url)
         }
     }
     
     private func rateApp() {
-        // Update this with your actual App Store ID when published
-        // Format: https://apps.apple.com/app/id{YOUR_APP_ID}?action=write-review
-        if let url = URL(string: "https://apps.apple.com/app/id123456789?action=write-review") {
+        // Opens App Store review page for Captain
+        if let url = URL(string: "https://apps.apple.com/app/id6768445637?action=write-review") {
             UIApplication.shared.open(url)
         }
     }

@@ -1,6 +1,6 @@
 import SwiftUI
-import Combine
 import UIKit
+import Combine
 
 struct PlayerProfile: Codable {
     var firstName: String = ""
@@ -60,29 +60,41 @@ final class ProfileStore: ObservableObject {
     
     // MARK: - Profile Photo Management
     
-    func setProfilePhoto(_ image: UIImage) {
-        // Delete old photo if exists
-        if let oldFilename = profile.profilePhotoFilename {
-            deleteProfilePhoto(filename: oldFilename)
-        }
-        
-        // Save new photo
-        let filename = "profile_\(UUID().uuidString).jpg"
-        if saveProfilePhoto(image, filename: filename) {
-            profile.profilePhotoFilename = filename
-            save()
-        }
+    /// Set profile photo - performs file I/O on background thread to avoid blocking main thread
+    @MainActor
+    func setProfilePhoto(_ image: UIImage) async {
+        await Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self = self else { return }
+            
+            // Delete old photo on background thread
+            if let oldFilename = await self.profile.profilePhotoFilename {
+                self.deleteProfilePhoto(filename: oldFilename)
+            }
+            
+            // Save new photo on background thread
+            let filename = "profile_\(UUID().uuidString).jpg"
+            if self.saveProfilePhoto(image, filename: filename) {
+                // Update UI on main thread
+                await MainActor.run {
+                    self.profile.profilePhotoFilename = filename
+                    self.save()
+                }
+            }
+        }.value
     }
     
+    /// Get profile photo - loads from disk synchronously (acceptable for display)
     func getProfilePhoto() -> UIImage? {
         guard let filename = profile.profilePhotoFilename else { return nil }
         return loadProfilePhoto(filename: filename)
     }
     
     private func saveProfilePhoto(_ image: UIImage, filename: String) -> Bool {
+        // JPEG compression happens on background thread - safe!
         guard let data = image.jpegData(compressionQuality: 0.8) else { return false }
         let url = profilePhotoURL(filename: filename)
         do {
+            // File write happens on background thread - safe!
             try data.write(to: url)
             return true
         } catch {
@@ -93,12 +105,14 @@ final class ProfileStore: ObservableObject {
     
     private func loadProfilePhoto(filename: String) -> UIImage? {
         let url = profilePhotoURL(filename: filename)
+        // File read happens on background thread when called from async method
         guard let data = try? Data(contentsOf: url) else { return nil }
         return UIImage(data: data)
     }
     
     private func deleteProfilePhoto(filename: String) {
         let url = profilePhotoURL(filename: filename)
+        // File delete happens on background thread when called from async method
         try? FileManager.default.removeItem(at: url)
     }
     
@@ -109,49 +123,64 @@ final class ProfileStore: ObservableObject {
 }
 
 struct BuildProfileView: View {
-    @StateObject private var store = ProfileStore()
+    @EnvironmentObject var profileStore: ProfileStore
     @Environment(\.dismiss) private var dismiss
+    
+    // Local state for editing - prevents live updates to shared store
+    @State private var firstName: String = ""
+    @State private var lastName: String = ""
+    @State private var dob: Date?
+    @State private var school: String = ""
+    @State private var grade: String = ""
+    @State private var age: Int?
+    @State private var location: String = ""
+    @State private var position: String = ""
+    @State private var clubTeam: String = ""
+    
+    private var canSave: Bool {
+        !firstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !lastName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     var body: some View {
         Form {
             Section(header: Text("Personal")) {
                 // Name fields
-                TextField("First name", text: Binding(get: { store.profile.firstName }, set: { store.profile.firstName = $0 }))
-                TextField("Last name", text: Binding(get: { store.profile.lastName }, set: { store.profile.lastName = $0 }))
+                TextField("First name", text: $firstName)
+                TextField("Last name", text: $lastName)
 
-                DatePicker("Date of Birth", selection: Binding(get: {
-                    store.profile.dob ?? Date()
-                }, set: { newVal in
-                    store.profile.dob = newVal
-                    store.profile.age = calculateAge(from: newVal)
-                }), displayedComponents: .date)
+                DatePicker("Date of Birth", selection: Binding(
+                    get: { dob ?? Date() },
+                    set: { newVal in
+                        dob = newVal
+                        age = calculateAge(from: newVal)
+                    }
+                ), displayedComponents: .date)
 
                 HStack {
                     Text("Age")
                     Spacer()
-                    Text(store.profile.age.map { String($0) } ?? "—")
+                    Text(age.map { String($0) } ?? "—")
                         .foregroundColor(.secondary)
                 }
 
-                TextField("School", text: Binding(get: { store.profile.school }, set: { store.profile.school = $0 }))
-                TextField("Grade", text: Binding(get: { store.profile.grade }, set: { store.profile.grade = $0 }))
-                TextField("Location (City)", text: Binding(get: { store.profile.location }, set: { store.profile.location = $0 }))
+                TextField("School", text: $school)
+                TextField("Grade", text: $grade)
+                TextField("Location (City)", text: $location)
             }
 
             Section(header: Text("Soccer")) {
-                TextField("Position", text: Binding(get: { store.profile.position }, set: { store.profile.position = $0 }))
-                TextField("Club Team", text: Binding(get: { store.profile.clubTeam }, set: { store.profile.clubTeam = $0 }))
+                TextField("Position", text: $position)
+                TextField("Club Team", text: $clubTeam)
             }
 
             Section {
                 Button("Save Profile") {
-                    store.save()
-                    // Post notification to navigate to main app
-                    NotificationCenter.default.post(name: Notification.Name("ProfileCompleted"), object: nil)
+                    saveProfile()
                 }
-                .disabled(!store.hasProfile)
+                .disabled(!canSave)
                 
-                if !store.hasProfile {
+                if !canSave {
                     Text("Please enter at least your first and last name")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -159,6 +188,40 @@ struct BuildProfileView: View {
             }
         }
         .navigationTitle("Build Your Profile")
+        .onAppear {
+            loadCurrentProfile()
+        }
+    }
+    
+    private func loadCurrentProfile() {
+        // Pre-fill with existing data if editing
+        firstName = profileStore.profile.firstName
+        lastName = profileStore.profile.lastName
+        dob = profileStore.profile.dob
+        school = profileStore.profile.school
+        grade = profileStore.profile.grade
+        age = profileStore.profile.age
+        location = profileStore.profile.location
+        position = profileStore.profile.position
+        clubTeam = profileStore.profile.clubTeam
+    }
+    
+    private func saveProfile() {
+        // Update the shared store only when saving
+        profileStore.profile.firstName = firstName
+        profileStore.profile.lastName = lastName
+        profileStore.profile.dob = dob
+        profileStore.profile.school = school
+        profileStore.profile.grade = grade
+        profileStore.profile.age = age
+        profileStore.profile.location = location
+        profileStore.profile.position = position
+        profileStore.profile.clubTeam = clubTeam
+        
+        profileStore.save()
+        
+        // Notify ContentView that profile is complete
+        NotificationCenter.default.post(name: Notification.Name("ProfileCompleted"), object: nil)
     }
 
     func calculateAge(from dob: Date) -> Int {
@@ -173,6 +236,7 @@ struct BuildProfileView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
             BuildProfileView()
+                .environmentObject(ProfileStore())
         }
     }
 }

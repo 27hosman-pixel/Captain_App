@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 struct ProfileView: View {
-    @StateObject private var store = ProfileStore()
+    @EnvironmentObject var profileStore: ProfileStore
     @EnvironmentObject var router: AppRouter
     @EnvironmentObject var sessionStore: SessionStore
     @EnvironmentObject var previewStore: PreviewStore
@@ -24,7 +24,7 @@ struct ProfileView: View {
                     HStack(alignment: .top, spacing: Theme.Spacing.md) {
                         // Avatar
                         Button(action: { showingPhotoPicker = true }) {
-                            if let profileImage = store.getProfilePhoto() {
+                            if let profileImage = profileStore.getProfilePhoto() {
                                 Image(uiImage: profileImage)
                                     .resizable()
                                     .scaledToFill()
@@ -49,14 +49,14 @@ struct ProfileView: View {
                             Text(displayName())
                                 .font(.system(size: 24, weight: .bold))
                             
-                            if !store.profile.location.isEmpty {
-                                Text(store.profile.location)
+                            if !profileStore.profile.location.isEmpty {
+                                Text(profileStore.profile.location)
                                     .font(.system(size: 15))
                                     .foregroundColor(.secondary)
                             }
                             
-                            if !store.profile.position.isEmpty {
-                                Text(store.profile.position)
+                            if !profileStore.profile.position.isEmpty {
+                                Text(profileStore.profile.position)
                                     .font(.system(size: 14))
                                     .foregroundColor(.secondary)
                             }
@@ -84,9 +84,9 @@ struct ProfileView: View {
 
                     // Goals
                     GoalsRow(
-                        day: store.profile.goalsDay,
-                        week: store.profile.goalsWeek,
-                        season: store.profile.goalsSeason,
+                        day: profileStore.profile.goalsDay,
+                        week: profileStore.profile.goalsWeek,
+                        season: profileStore.profile.goalsSeason,
                         onEdit: { showingGoals = true }
                     )
 
@@ -94,11 +94,11 @@ struct ProfileView: View {
                     AboutCard(
                         dob: formattedDOB(),
                         age: derivedAge(),
-                        school: store.profile.school,
-                        grade: store.profile.grade,
-                        location: store.profile.location,
-                        position: store.profile.position,
-                        club: store.profile.clubTeam,
+                        school: profileStore.profile.school,
+                        grade: profileStore.profile.grade,
+                        location: profileStore.profile.location,
+                        position: profileStore.profile.position,
+                        club: profileStore.profile.clubTeam,
                         onEdit: {
                             showingAboutEditor = true
                         }
@@ -113,24 +113,24 @@ struct ProfileView: View {
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            store.load()
+            profileStore.load()
         }
         // Goals editor sheet
         .sheet(isPresented: $showingGoals) {
             NavigationView {
                 Form {
                     Section(header: Text("Daily Goal")) {
-                        TextField("Day goals", text: Binding(get: { store.profile.goalsDay }, set: { store.profile.goalsDay = $0 }))
+                        TextField("Day goals", text: Binding(get: { profileStore.profile.goalsDay }, set: { profileStore.profile.goalsDay = $0 }))
                     }
                     Section(header: Text("Weekly Goal")) {
-                        TextField("Week goals", text: Binding(get: { store.profile.goalsWeek }, set: { store.profile.goalsWeek = $0 }))
+                        TextField("Week goals", text: Binding(get: { profileStore.profile.goalsWeek }, set: { profileStore.profile.goalsWeek = $0 }))
                     }
                     Section(header: Text("Season Goal")) {
-                        TextField("Season goals", text: Binding(get: { store.profile.goalsSeason }, set: { store.profile.goalsSeason = $0 }))
+                        TextField("Season goals", text: Binding(get: { profileStore.profile.goalsSeason }, set: { profileStore.profile.goalsSeason = $0 }))
                     }
                     Section {
                         Button("Save") {
-                            store.save()
+                            profileStore.save()
                             showingGoals = false
                         }
                         Button("Cancel") {
@@ -155,8 +155,8 @@ struct ProfileView: View {
                         DatePicker(
                             "Date of Birth",
                             selection: Binding(
-                                get: { store.profile.dob ?? Date() },
-                                set: { store.profile.dob = $0 }
+                                get: { profileStore.profile.dob ?? Date() },
+                                set: { profileStore.profile.dob = $0 }
                             ),
                             displayedComponents: [.date]
                         )
@@ -164,31 +164,31 @@ struct ProfileView: View {
                         TextField(
                             "Age",
                             text: Binding(
-                                get: { store.profile.age != nil ? String(store.profile.age!) : "" },
-                                set: { store.profile.age = Int($0) }
+                                get: { profileStore.profile.age != nil ? String(profileStore.profile.age!) : "" },
+                                set: { profileStore.profile.age = Int($0) }
                             )
                         )
                         .keyboardType(.numberPad)
                     }
                     
                     Section(header: Text("School")) {
-                        TextField("School Name", text: Binding(get: { store.profile.school }, set: { store.profile.school = $0 }))
+                        TextField("School Name", text: Binding(get: { profileStore.profile.school }, set: { profileStore.profile.school = $0 }))
                         
                         TextField(
                             "Grade",
                             text: Binding(
-                                get: { store.profile.grade },
-                                set: { store.profile.grade = $0 }
+                                get: { profileStore.profile.grade },
+                                set: { profileStore.profile.grade = $0 }
                             )
                         )
                     }
                     
                     Section(header: Text("Soccer Info")) {
-                        TextField("Location", text: Binding(get: { store.profile.location }, set: { store.profile.location = $0 }))
+                        TextField("Location", text: Binding(get: { profileStore.profile.location }, set: { profileStore.profile.location = $0 }))
                         
-                        TextField("Position", text: Binding(get: { store.profile.position }, set: { store.profile.position = $0 }))
+                        TextField("Position", text: Binding(get: { profileStore.profile.position }, set: { profileStore.profile.position = $0 }))
                         
-                        TextField("Club Team", text: Binding(get: { store.profile.clubTeam }, set: { store.profile.clubTeam = $0 }))
+                        TextField("Club Team", text: Binding(get: { profileStore.profile.clubTeam }, set: { profileStore.profile.clubTeam = $0 }))
                     }
                 }
                 .navigationTitle("About")
@@ -201,7 +201,7 @@ struct ProfileView: View {
                     }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Save") {
-                            store.save()
+                            profileStore.save()
                             showingAboutEditor = false
                         }
                     }
@@ -220,7 +220,7 @@ struct ProfileView: View {
             if let selectedImage {
                 ImageCropperView(image: selectedImage) { croppedImage in
                     if let croppedImage {
-                        store.setProfilePhoto(croppedImage)
+                        profileStore.setProfilePhoto(croppedImage)
                     }
                     showingImageEditor = false
                 }
@@ -283,8 +283,8 @@ struct ProfileView: View {
 
     // MARK: - Helpers (unchanged)
     private func displayName() -> String {
-        let f = store.profile.firstName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let l = store.profile.lastName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let f = profileStore.profile.firstName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let l = profileStore.profile.lastName.trimmingCharacters(in: .whitespacesAndNewlines)
         if !f.isEmpty || !l.isEmpty {
             return [f, l].filter { !$0.isEmpty }.joined(separator: " ")
         }
@@ -292,17 +292,17 @@ struct ProfileView: View {
     }
 
     private func formattedDOB() -> String {
-        guard let dob = store.profile.dob else { return "—" }
+        guard let dob = profileStore.profile.dob else { return "—" }
         let df = DateFormatter()
         df.dateStyle = .medium
         return df.string(from: dob)
     }
 
     private func derivedAge() -> String {
-        if let age = store.profile.age, age > 0 {
+        if let age = profileStore.profile.age, age > 0 {
             return String(age)
         }
-        guard let dob = store.profile.dob else { return "—" }
+        guard let dob = profileStore.profile.dob else { return "—" }
         let cal = Calendar.current
         let comps = cal.dateComponents([.year], from: dob, to: Date())
         if let years = comps.year { return String(years) }

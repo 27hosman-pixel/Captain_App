@@ -96,12 +96,12 @@ struct StatCardRenderer {
         // Use ImageRenderer to convert SwiftUI view to UIImage
         let renderer = ImageRenderer(content: cardView)
         
-        // Set scale for high quality
-        // Use windowScene scale for iOS 26.0+, fallback to main scale
+        // Set scale for high quality - use windowScene scale
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
             renderer.scale = windowScene.screen.scale
         } else {
-            renderer.scale = UIScreen.main.scale
+            // Fallback to 3x scale (standard for modern devices)
+            renderer.scale = 3.0
         }
         
         // Render the image

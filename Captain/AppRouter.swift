@@ -3,8 +3,6 @@ import Combine
 
 enum Destination: Hashable {
     case home
-    case login
-    case signup
     case buildProfile
     case profile
     case logSession

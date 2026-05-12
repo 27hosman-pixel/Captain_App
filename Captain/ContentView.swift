@@ -56,8 +56,9 @@ struct ContentView: View {
         .environmentObject(feedFilters)
         .environmentObject(profileStore)
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ProfileCompleted"))) { _ in
-            // Profile was saved, refresh to check hasProfile
-            profileStore.load()
+            // Profile was saved - ProfileStore is already updated via @EnvironmentObject
+            // Just reset the showingBuildProfile flag to ensure clean state
+            showingBuildProfile = false
         }
     }
 
@@ -167,53 +168,103 @@ struct ContentView: View {
     private var landingView: some View {
         NavigationStack {
             ZStack {
-                Color.white.ignoresSafeArea()
+                // Gradient background matching stats/log pages
+                LinearGradient(
+                    colors: [
+                        Color.blue.opacity(0.15),
+                        Color.purple.opacity(0.10),
+                        Color.cyan.opacity(0.08)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
                 VStack(spacing: 0) {
                     Spacer()
                     
-                    // Logo and branding
-                    VStack(spacing: 8) {
+                    // Logo and branding with modern styling
+                    VStack(spacing: 20) {
+                        // App title with modern gradient using overlay
                         Text("CAPTAIN")
-                            .font(.system(size: 56, weight: .bold, design: .monospaced))
-                            .foregroundColor(.black)
+                            .font(.system(size: 52, weight: .bold, design: .rounded))
+                            .foregroundColor(.clear)
+                            .overlay(
+                                LinearGradient(
+                                    colors: [Color.blue, Color.cyan],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .mask(
+                                Text("CAPTAIN")
+                                    .font(.system(size: 52, weight: .bold, design: .rounded))
+                            )
 
-                        Image("CaptainLogo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 300, height: 300)
+                        // Logo with enhanced shadow and border
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color.white, Color.blue.opacity(0.05)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 320, height: 320)
+                                .shadow(color: Color.blue.opacity(0.3), radius: 20, x: 0, y: 10)
+                            
+                            Image("CaptainLogo")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 300, height: 300)
+                                .clipShape(Circle())
+                        }
                     }
                     
                     Spacer()
                     
-                    // Call to action
-                    VStack(spacing: 12) {
+                    // Call to action with enhanced styling
+                    VStack(spacing: 16) {
                         Text("Track Your Soccer Journey")
-                            .font(.title3)
-                            .fontWeight(.medium)
-                            .foregroundColor(.black.opacity(0.8))
+                            .font(.system(size: 26, weight: .bold))
+                            .foregroundColor(.clear)
+                            .overlay(
+                                LinearGradient(
+                                    colors: [Color.primary, Color.blue],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .mask(
+                                Text("Track Your Soccer Journey")
+                                    .font(.system(size: 26, weight: .bold))
+                            )
                         
                         Text("Log sessions, track progress, reach your goals")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 40)
                     }
-                    .padding(.bottom, 32)
+                    .padding(.bottom, 40)
                     
-                    // Get Started button
+                    // Get Started button with modern gradient
                     Button(action: {
                         showingBuildProfile = true
                     }) {
-                        Text("GET STARTED")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
+                        HStack(spacing: 12) {
+                            Text("GET STARTED")
+                                .font(.system(size: 18, weight: .bold))
+                            
+                            Image(systemName: "arrow.right.circle.fill")
+                                .font(.system(size: 20))
+                        }
+                        .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(PillButtonStyle(
-                        colors: [
-                            Color(red: 0.78, green: 0.94, blue: 0.99),
-                            Color(red: 0.68, green: 0.91, blue: 0.98)
-                        ],
-                        foreground: .black
+                        colors: [Color.blue, Color.cyan],
+                        foreground: Color.white
                     ))
                     .padding(.horizontal, 36)
                     .padding(.bottom, 60)
@@ -258,9 +309,6 @@ struct ContentView: View {
                 MessagingView()
             case .notifications:
                 NotificationsView()
-            case .login, .signup:
-                // These destinations no longer exist, show home instead
-                HomeView()
             }
         }
         .onAppear {
@@ -285,21 +333,32 @@ struct PillButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .foregroundColor(foreground)
-            .padding(.vertical, 18)
+            .padding(.vertical, 20)
             .frame(maxWidth: .infinity)
             .background(
                 ZStack {
-                    RoundedRectangle(cornerRadius: 40, style: .continuous)
-                        .fill(LinearGradient(gradient: Gradient(colors: colors), startPoint: .top, endPoint: .bottom))
-                    RoundedRectangle(cornerRadius: 40, style: .continuous)
-                        .stroke(Color.white.opacity(0.6), lineWidth: 1)
-                        .blendMode(.screen)
+                    RoundedRectangle(cornerRadius: 30, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: colors,
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    RoundedRectangle(cornerRadius: 30, style: .continuous)
+                        .stroke(Color.white.opacity(0.3), lineWidth: 1.5)
+                        .blendMode(.overlay)
                         .padding(0.5)
                 }
             )
-            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
-            .shadow(color: Color.black.opacity(configuration.isPressed ? 0.08 : 0.18), radius: configuration.isPressed ? 6 : 12, x: 0, y: configuration.isPressed ? 3 : 8)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .shadow(
+                color: colors.first?.opacity(configuration.isPressed ? 0.3 : 0.5) ?? Color.black.opacity(0.2),
+                radius: configuration.isPressed ? 8 : 16,
+                x: 0,
+                y: configuration.isPressed ? 4 : 8
+            )
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }
 
