@@ -220,9 +220,14 @@ struct ProfileView: View {
             if let selectedImage {
                 ImageCropperView(image: selectedImage) { croppedImage in
                     if let croppedImage {
-                        profileStore.setProfilePhoto(croppedImage)
+                        // setProfilePhoto is async; call it from a Task
+                        Task { @MainActor in
+                            await profileStore.setProfilePhoto(croppedImage)
+                            showingImageEditor = false
+                        }
+                    } else {
+                        showingImageEditor = false
                     }
-                    showingImageEditor = false
                 }
             }
         }
